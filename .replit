@@ -1,5 +1,6 @@
-run = "python -m uvicorn src.server:app --host 0.0.0.0 --port 3000"
+run = "pip install -e . && python -m uvicorn src.server:app --host 0.0.0.0 --port 3000"
 entrypoint = "src/server.py"
+language = "python3"
 
 [nix]
 channel = "stable-24_05"
@@ -8,4 +9,6 @@ channel = "stable-24_05"
 PORT = "3000"
 
 [deployment]
-run = ["sh", "-c", "pip install -e . && python -m uvicorn src.server:app --host 0.0.0.0 --port 3000"]
+build = ["sh", "-c", "pip install -e ."]
+run = ["sh", "-c", "python -m uvicorn src.server:app --host 0.0.0.0 --port 3000"]
+deploymentTarget = "cloudrun"
