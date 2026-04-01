@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "deny": [
+      "Bash(rm -rf *)",
+      "Bash(curl *)",
+      "Bash(wget *)",
+      "Bash(sudo *)",
+      "Edit(.env)",
+      "Read(.env)"
+    ],
+    "allow": [
+      "Bash(pytest *)",
+      "Bash(ruff *)",
+      "Bash(bandit *)",
+      "Bash(pip-audit)",
+      "Bash(pip install *)",
+      "Bash(python src/ingest.py *)",
+      "Bash(python src/upload.py *)",
+      "Bash(git status)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Read(src/**)",
+      "Read(tests/**)"
+    ]
+  }
+}
