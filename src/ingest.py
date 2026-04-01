@@ -120,14 +120,15 @@ def fetch_index(
 
     filings = []
     for line in resp.text.splitlines():
-        parts = line.split("|")
+        # Index is fixed-width columns separated by 2+ spaces
+        parts = re.split(r"\s{2,}", line.strip())
         if len(parts) < 5:
             continue
-        company_name = parts[0].strip()
-        form_type = parts[1].strip()
-        cik = parts[2].strip()
-        date_filed = parts[3].strip()
-        filename = parts[4].strip()
+        company_name = parts[0]
+        form_type = parts[1]
+        cik = parts[2]
+        date_filed = parts[3]
+        filename = parts[4]
 
         if form_type not in FILING_TYPES:
             continue
@@ -151,42 +152,18 @@ def fetch_index(
 
 
 def download_filing(client: httpx.Client, filing: dict) -> str | None:
-    """Download a single filing and return its text content."""
+    """Download a single filing and return its text content.
+
+    The index URL points to the full filing .txt file which contains
+    all documents (SEC header + embedded HTML/XBRL). We download it
+    directly — it IS the filing.
+    """
     time.sleep(REQUEST_DELAY)
     try:
         resp = client.get(filing["index_url"])
         if resp.status_code != 200:
             return None
-
-        # Parse the index page to find the primary document
-        text = resp.text
-        doc_url = None
-
-        # Look for .htm or .txt filing document in the index
-        for line in text.splitlines():
-            if ".htm" in line.lower() or ".txt" in line.lower():
-                match = re.search(r'href="([^"]+)"', line)
-                if match:
-                    href = match.group(1)
-                    if not href.startswith("http"):
-                        if href.startswith("/"):
-                            href = f"{SEC_BASE}{href}"
-                        else:
-                            cik = filing["cik"]
-                            href = f"{SEC_BASE}/Archives/edgar/data/{cik}/{href}"
-                    doc_url = href
-                    break
-
-        if not doc_url:
-            return None
-
-        time.sleep(REQUEST_DELAY)
-        doc_resp = client.get(doc_url)
-        if doc_resp.status_code != 200:
-            return None
-
-        return doc_resp.text
-
+        return resp.text
     except Exception:
         logger.exception(f"Error downloading {filing['index_url']}")
         return None
