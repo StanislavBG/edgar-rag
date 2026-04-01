@@ -91,9 +91,7 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONRe
 
 
 # --- Middleware ---
-ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "edgar-rag.bilko.run,localhost,127.0.0.1").split(
-    ","
-)
+ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "*").split(",")
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=ALLOWED_HOSTS)
 
 
