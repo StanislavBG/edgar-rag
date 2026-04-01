@@ -6,11 +6,11 @@ build-backend = "setuptools.build_meta"
 name = "edgar-rag"
 version = "0.1.0"
 description = "SEC EDGAR RAG microservice for AI agents via x402 micropayments"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.14"
 dependencies = [
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.32.0",
-    "lancedb==0.19.0",
+    "lancedb>=0.19.0",
     "sentence-transformers>=3.3.0",
     "slowapi>=0.1.9",
     "pydantic>=2.10.0",
