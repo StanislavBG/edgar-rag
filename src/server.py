@@ -30,6 +30,53 @@ app = FastAPI(title="EDGAR RAG", version="0.1.0")
 app.include_router(query_router)
 app.include_router(mcp_router)
 
+
+# --- x402 Payment Middleware ---
+def _setup_x402() -> None:
+    """Configure x402 payment gating on /v1/query. Skipped if wallet not configured."""
+    wallet = os.environ.get("WALLET_ADDRESS", "")
+    facilitator_url = os.environ.get("X402_FACILITATOR_URL", "https://x402.org/facilitator")
+
+    if not wallet:
+        logger.warning("WALLET_ADDRESS not set — x402 payment gating DISABLED")
+        return
+
+    try:
+        from x402.http import (
+            FacilitatorConfig,
+            HTTPFacilitatorClient,
+            PaymentOption,
+            RouteConfig,
+        )
+        from x402.http.middleware.fastapi import PaymentMiddlewareASGI
+        from x402.mechanisms.evm.exact import ExactEvmServerScheme
+        from x402.server import x402ResourceServer
+
+        facilitator = HTTPFacilitatorClient(FacilitatorConfig(url=facilitator_url))
+        server = x402ResourceServer(facilitator)
+        server.register("eip155:8453", ExactEvmServerScheme())  # Base mainnet
+
+        routes = {
+            "POST /v1/query": RouteConfig(
+                accepts=PaymentOption(
+                    scheme="exact",
+                    price="$0.01",
+                    network="eip155:8453",  # Base L2
+                    pay_to=wallet,
+                ),
+                description="Search SEC EDGAR filings",
+            ),
+        }
+
+        app.add_middleware(PaymentMiddlewareASGI, routes=routes, server=server)
+        logger.info("x402 payment gating ENABLED on /v1/query ($0.01 USDC on Base)")
+
+    except Exception:
+        logger.exception("Failed to initialize x402 — payment gating DISABLED")
+
+
+_setup_x402()
+
 # --- Rate limiter ---
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter

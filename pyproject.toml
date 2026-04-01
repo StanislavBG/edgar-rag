@@ -18,6 +18,7 @@ dependencies = [
     "httpx>=0.28.0",
     "python-multipart>=0.0.18",
     "python-dotenv>=1.0.0",
+    "x402[evm]>=2.5.0",
 ]
 
 [project.optional-dependencies]

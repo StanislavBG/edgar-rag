@@ -1,0 +1,72 @@
+# Companies to ingest SEC filings for.
+# One ticker per line. Lines starting with # are comments.
+# Start small, expand as needed.
+
+# Big Tech
+AAPL
+MSFT
+GOOGL
+AMZN
+META
+NVDA
+TSLA
+
+# Finance
+JPM
+GS
+BAC
+BRK-B
+V
+MA
+
+# Healthcare
+JNJ
+UNH
+PFE
+LLY
+ABBV
+
+# Consumer
+WMT
+KO
+PEP
+MCD
+NKE
+DIS
+
+# Energy
+XOM
+CVX
+
+# Industrial
+CAT
+BA
+GE
+HON
+
+# Telecom / Media
+NFLX
+CRM
+ORCL
+ADBE
+INTC
+
+# Crypto adjacent
+COIN
+SQ
+
+# Defense
+LMT
+RTX
+
+# Semiconductors
+AMD
+AVGO
+QCOM
+TXN
+
+# Real Estate / Finance
+BLK
+SCHW
+
+# Total: ~50 companies
