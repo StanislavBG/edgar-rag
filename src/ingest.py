@@ -376,6 +376,9 @@ def run_ingest(
     companies_path = Path(companies_file) if companies_file else COMPANIES_FILE
     tickers = load_companies(companies_path)
     allowed_ciks: set[str] | None = None
+    # Build CIK mappings
+    ticker_to_cik: dict[str, str] = {}
+    cik_to_ticker: dict[str, str] = {}
     if tickers:
         ticker_to_cik = fetch_ticker_to_cik(client)
         allowed_ciks = set()
@@ -383,11 +386,13 @@ def run_ingest(
             cik = ticker_to_cik.get(ticker)
             if cik:
                 allowed_ciks.add(cik)
+                cik_to_ticker[cik] = ticker
             else:
                 logger.warning(f"Ticker not found in SEC mapping: {ticker}")
         logger.info(f"Filtering to {len(allowed_ciks)} companies by CIK")
 
     all_chunks: list[dict] = []
+    filing_stats: list[dict] = []  # For tracker
 
     for y, q in quarters:
         filings = fetch_index(client, y, q, allowed_ciks=allowed_ciks)
@@ -408,6 +413,23 @@ def run_ingest(
             chunks = create_chunks(filing, text)
             all_chunks.extend(chunks)
 
+            # Track this filing
+            ticker = cik_to_ticker.get(filing["cik"], filing["cik"])
+            accession = filing.get(
+                "accession_number", filing["index_url"].split("/")[-1].replace(".txt", "")
+            )
+            filing_stats.append(
+                {
+                    "ticker": ticker,
+                    "company_name": filing["company_name"],
+                    "cik": filing["cik"],
+                    "filing_type": filing["filing_type"],
+                    "filing_date": filing["filing_date"],
+                    "accession_number": accession,
+                    "chunks_count": len(chunks),
+                }
+            )
+
     client.close()
 
     if not all_chunks:
@@ -421,6 +443,13 @@ def run_ingest(
     logger.info("Storing in LanceDB...")
     total = store_chunks(all_chunks, vectors)
     logger.info(f"Done. Total rows in LanceDB: {total}")
+
+    # Record in tracker
+    from src.tracker import record_filing
+
+    for stat in filing_stats:
+        record_filing(**stat)
+    logger.info(f"Tracked {len(filing_stats)} filings in tracker.db")
 
 
 def main() -> None:
