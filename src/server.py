@@ -130,6 +130,57 @@ def _unauthorized() -> Exception:
 
 
 # --- Endpoints ---
+@app.get("/")
+async def root() -> dict:
+    """Landing page — API overview for agents and humans."""
+    db = get_db()
+    filing_count = 0
+    if db is not None:
+        try:
+            table = db.open_table("sec-edgar")
+            filing_count = table.count_rows()
+        except Exception:
+            logger.debug("LanceDB table not available")
+    return {
+        "service": "EDGAR RAG",
+        "version": "0.1.0",
+        "description": (
+            "Semantic search over SEC EDGAR filings (10-K, 10-Q, 8-K). "
+            "Query via REST API or MCP. Paid via x402 micropayments ($0.01/query)."
+        ),
+        "filings_indexed": filing_count,
+        "endpoints": {
+            "POST /v1/query": {
+                "description": "Search SEC filings by natural language query",
+                "cost": "$0.01 USDC via x402",
+                "body": {
+                    "query": "string (required, max 1000 chars)",
+                    "filing_type": "10-K | 10-Q | 8-K (optional)",
+                    "company": "string (optional, max 200 chars)",
+                    "top_k": "integer 1-20 (default 5)",
+                },
+                "returns": "Ranked text passages with company, date, section, source URL",
+            },
+            "POST /mcp": {
+                "description": "MCP Streamable HTTP endpoint",
+                "methods": {
+                    "initialize": "free — returns server info",
+                    "tools/list": "free — returns available tools",
+                    "tools/call search_filings": "$0.01 USDC via x402",
+                },
+            },
+            "GET /health": "Service status and filing count",
+        },
+        "payment": {
+            "protocol": "x402 (HTTP 402 Payment Required)",
+            "amount": "$0.01",
+            "asset": "USDC",
+            "network": "Base L2 (eip155:8453)",
+        },
+        "source": "https://github.com/StanislavBG/edgar-rag",
+    }
+
+
 @app.get("/health")
 async def health() -> dict:
     db = get_db()
