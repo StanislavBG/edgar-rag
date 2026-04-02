@@ -1,4 +1,4 @@
-run = "pip install -r requirements.txt && python -m uvicorn src.server:app --host 0.0.0.0 --port 3000"
+run = "python -m uvicorn src.server:app --host 0.0.0.0 --port 3000"
 entrypoint = "src/server.py"
 language = "python3"
 disableInstallBeforeRun = true
@@ -12,5 +12,4 @@ PORT = "3000"
 PYTHONPATH = "/home/runner/workspace"
 
 [deployment]
-build = ["sh", "-c", "pip install --target=.pythonlibs -r requirements.txt"]
-run = ["sh", "-c", "PYTHONPATH=.pythonlibs:/home/runner/workspace python -m uvicorn src.server:app --host 0.0.0.0 --port 3000"]
+run = ["sh", "-c", "python -m uvicorn src.server:app --host 0.0.0.0 --port 3000"]
