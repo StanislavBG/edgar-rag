@@ -1,0 +1,12 @@
+# Runtime dependencies for Replit deployment only.
+# Local dev uses: pip install -e ".[dev]"
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+lancedb>=0.30.0
+sentence-transformers>=3.3.0
+slowapi>=0.1.9
+pydantic>=2.10.0
+httpx>=0.28.0
+python-multipart>=0.0.18
+python-dotenv>=1.0.0
+x402[evm]>=2.5.0

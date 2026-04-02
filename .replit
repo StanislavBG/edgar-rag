@@ -1,4 +1,4 @@
-run = "pip install -e . && python -m uvicorn src.server:app --host 0.0.0.0 --port 3000"
+run = "pip install -r requirements.txt && python -m uvicorn src.server:app --host 0.0.0.0 --port 3000"
 entrypoint = "src/server.py"
 language = "python3"
 disableInstallBeforeRun = true
@@ -14,6 +14,6 @@ PORT = "3000"
 ignoredPackages = ["edgartools"]
 
 [deployment]
-build = ["sh", "-c", "pip install -e ."]
+build = ["sh", "-c", "pip install -r requirements.txt"]
 run = ["sh", "-c", "python -m uvicorn src.server:app --host 0.0.0.0 --port 3000"]
 deploymentTarget = "cloudrun"
