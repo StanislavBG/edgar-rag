@@ -1,9 +1,46 @@
-data/
+# Python
 __pycache__/
-*.pyc
-.env
+*.py[cod]
 *.egg-info/
 dist/
+.venv/
 .ruff_cache/
 .pytest_cache/
-.venv/
+.env
+
+# edgar-rag: persistent vector data — not in Git
+data/
+
+# uv lock file — keep off GitHub, otherwise Replit deployment switches from
+# pip install to uv sync (which installs dev extras and uses a broken resolver)
+uv.lock
+
+# Application source code owned by the upstream GitHub repo.
+# These files exist on disk (synced from origin) but are NOT tracked in
+# Replit's environment repo — they live at https://github.com/StanislavBG/edgar-rag
+# NOTE: pyproject.toml IS tracked here (required by pip install -e . at deploy time)
+src/
+companies.txt
+
+# Replit pnpm workspace files (auto-generated; not part of edgar-rag)
+package.json
+pnpm-lock.yaml
+pnpm-workspace.yaml
+.npmrc
+node_modules/
+tsconfig.json
+tsconfig.base.json
+lib/
+scripts/
+artifacts/
+
+# IDE / OS
+/.idea
+.vscode/*
+!.vscode/settings.json
+.DS_Store
+Thumbs.db
+
+# Replit internals
+.cache/
+.local/
