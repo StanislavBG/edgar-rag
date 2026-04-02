@@ -4,6 +4,7 @@ import functools
 import logging
 from typing import Literal, Optional
 
+import numpy as np
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
@@ -16,15 +17,61 @@ router = APIRouter()
 
 @functools.lru_cache(maxsize=1)
 def _load_model():
-    from sentence_transformers import SentenceTransformer
+    """Load embedding model. Uses sentence-transformers if available (local dev),
+    falls back to ONNX runtime (Replit — no torch needed).
+    """
+    try:
+        from sentence_transformers import SentenceTransformer
 
-    return SentenceTransformer(MODEL_NAME)
+        logger.info("Loading embedding model via sentence-transformers")
+        return ("sbert", SentenceTransformer(MODEL_NAME))
+    except ImportError:
+        pass
+
+    logger.info("Loading embedding model via ONNX runtime")
+    import onnxruntime as ort
+    from huggingface_hub import hf_hub_download
+    from tokenizers import Tokenizer
+
+    model_dir = hf_hub_download(repo_id=MODEL_NAME, filename="onnx/model.onnx")
+    tokenizer = Tokenizer.from_pretrained(MODEL_NAME)
+    tokenizer.enable_padding()
+    tokenizer.enable_truncation(max_length=512)
+    session = ort.InferenceSession(model_dir)
+    return ("onnx", session, tokenizer)
 
 
 def embed_query(text: str) -> list[float]:
-    model = _load_model()
-    vector = model.encode(text, normalize_embeddings=True)
-    return vector.tolist()
+    loaded = _load_model()
+
+    if loaded[0] == "sbert":
+        model = loaded[1]
+        vector = model.encode(text, normalize_embeddings=True)
+        return vector.tolist()
+
+    # ONNX path
+    session, tokenizer = loaded[1], loaded[2]
+    encoded = tokenizer.encode(text)
+    input_ids = np.array([encoded.ids], dtype=np.int64)
+    attention_mask = np.array([encoded.attention_mask], dtype=np.int64)
+    token_type_ids = np.zeros_like(input_ids)
+
+    outputs = session.run(
+        None,
+        {
+            "input_ids": input_ids,
+            "attention_mask": attention_mask,
+            "token_type_ids": token_type_ids,
+        },
+    )
+
+    # Mean pooling + L2 normalize
+    embeddings = outputs[0]  # (1, seq_len, hidden_dim)
+    mask = attention_mask[:, :, np.newaxis].astype(np.float32)
+    pooled = (embeddings * mask).sum(axis=1) / mask.sum(axis=1)
+    norm = np.linalg.norm(pooled, axis=1, keepdims=True)
+    normalized = pooled / norm
+    return normalized[0].tolist()
 
 
 class QueryRequest(BaseModel):
