@@ -1,5 +1,9 @@
-# Runtime dependencies for Replit deployment only.
-# Local dev uses: pip install -e ".[dev]"
+# Runtime dependencies for Replit deployment.
+# Uses CPU-only torch to avoid 2GB+ CUDA packages.
+
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch --index-url https://download.pytorch.org/whl/cpu
+
 fastapi>=0.115.0
 uvicorn[standard]>=0.32.0
 lancedb>=0.30.0
@@ -9,4 +13,3 @@ pydantic>=2.10.0
 httpx>=0.28.0
 python-multipart>=0.0.18
 python-dotenv>=1.0.0
-x402[evm]>=2.5.0
