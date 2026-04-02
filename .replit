@@ -9,9 +9,7 @@ channel = "stable-24_05"
 
 [env]
 PORT = "3000"
-
-[packager]
-ignoredPackages = ["edgartools"]
+PYTHONPATH = "/home/runner/workspace"
 
 [deployment]
 build = ["sh", "-c", "pip install -r requirements.txt"]
