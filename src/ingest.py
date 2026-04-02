@@ -170,15 +170,84 @@ def download_filing(client: httpx.Client, filing: dict) -> str | None:
 
 
 # --- Parsing ---
-def parse_filing_text(html: str) -> str:
-    """Extract clean text from filing HTML. Simple approach without heavy deps."""
-    # Remove HTML tags
+def extract_primary_document(raw: str) -> str:
+    """Extract only the primary document (10-K, 10-Q, 8-K HTM) from the raw SEC filing.
+
+    Raw SEC .txt files contain multiple embedded documents (XBRL, exhibits, graphics).
+    We only want the first document which is the actual filing HTML.
+    """
+    lines = raw.splitlines()
+    in_primary = False
+    primary_lines: list[str] = []
+
+    for line in lines:
+        if "<DOCUMENT>" in line and not in_primary:
+            in_primary = True
+            continue
+        if "</DOCUMENT>" in line and in_primary:
+            break  # Stop after first document
+        if in_primary:
+            # Skip the TYPE/SEQUENCE/FILENAME header lines
+            if line.startswith("<TYPE>") or line.startswith("<SEQUENCE>"):
+                continue
+            if line.startswith("<FILENAME>") or line.startswith("<DESCRIPTION>"):
+                continue
+            primary_lines.append(line)
+
+    return "\n".join(primary_lines)
+
+
+def parse_filing_text(raw: str) -> str:
+    """Extract clean readable text from filing.
+
+    1. Extract primary document (skip XBRL, exhibits, graphics)
+    2. Remove inline XBRL tags (ix:nonfraction, ix:nonnumeric, etc.)
+    3. Strip HTML tags
+    4. Clean up whitespace
+    """
+    # Step 1: Get only the primary HTM document
+    html = extract_primary_document(raw)
+    if len(html) < 100:
+        # Fallback: maybe it's not in SEC document format
+        html = raw
+
+    # Step 2: Remove inline XBRL tags but keep their text content
+    html = re.sub(r"<ix:[^>]*>", "", html)
+    html = re.sub(r"</ix:[^>]*>", "", html)
+
+    # Step 3: Remove style/script blocks entirely
+    html = re.sub(r"<style[^>]*>.*?</style>", " ", html, flags=re.DOTALL | re.IGNORECASE)
+    html = re.sub(r"<script[^>]*>.*?</script>", " ", html, flags=re.DOTALL | re.IGNORECASE)
+
+    # Step 4: Remove HTML tags
     text = re.sub(r"<[^>]+>", " ", html)
-    # Remove excessive whitespace
-    text = re.sub(r"\s+", " ", text)
-    # Remove common XBRL/XML artifacts
+
+    # Step 5: Decode HTML entities
+    text = re.sub(r"&nbsp;", " ", text)
+    text = re.sub(r"&amp;", "&", text)
+    text = re.sub(r"&lt;", "<", text)
+    text = re.sub(r"&gt;", ">", text)
     text = re.sub(r"&[a-zA-Z]+;", " ", text)
     text = re.sub(r"&#\d+;", " ", text)
+
+    # Step 6: Remove XBRL preamble (everything before first real content)
+    # Look for common filing start markers
+    for marker in [
+        "UNITED STATES",
+        "SECURITIES AND EXCHANGE",
+        "Table of Contents",
+        "PART I",
+    ]:
+        idx = text.find(marker)
+        if idx != -1 and idx < len(text) // 2:
+            text = text[idx:]
+            break
+
+    # Step 7: Clean whitespace (collapse runs of spaces, keep paragraph breaks)
+    text = re.sub(r"[ \t]+", " ", text)
+    text = re.sub(r"\n\s*\n", "\n\n", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+
     return text.strip()
 
 
