@@ -1,15 +1,14 @@
-run = "python -m uvicorn src.server:app --host 0.0.0.0 --port 3000"
 entrypoint = "src/server.py"
-language = "python3"
-disableInstallBeforeRun = true
-disableGuessImports = true
+modules = ["python-3.11"]
 
 [nix]
 channel = "stable-24_05"
 
 [env]
-PORT = "3000"
+PORT = "8080"
 PYTHONPATH = "/home/runner/workspace"
 
 [deployment]
-run = ["sh", "-c", "python -m uvicorn src.server:app --host 0.0.0.0 --port 3000"]
+build = "pip install -r requirements.txt"
+run = ["python3", "-m", "uvicorn", "src.server:app", "--host", "0.0.0.0", "--port", "8080"]
+deploymentTarget = "cloudrun"
