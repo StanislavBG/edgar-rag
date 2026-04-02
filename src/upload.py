@@ -15,7 +15,7 @@ from pathlib import Path
 import httpx
 from dotenv import load_dotenv
 
-DATA_DIR = Path("data/vectors")
+from src.db import DATA_DIR
 
 
 def main() -> None:

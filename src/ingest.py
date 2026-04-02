@@ -11,6 +11,7 @@ Run locally:
 from __future__ import annotations
 
 import argparse
+import functools
 import logging
 import os
 import re
@@ -25,11 +26,11 @@ import numpy as np
 import pyarrow as pa
 from dotenv import load_dotenv
 
+from src.db import DATA_DIR, MODEL_NAME, TABLE_NAME, VECTOR_DIM
+
 logger = logging.getLogger("edgar-ingest")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
-DATA_DIR = Path("data/vectors")
-VECTOR_DIM = 384
 CHUNK_TARGET = 512
 CHUNK_MAX = 1024
 CHUNK_OVERLAP = 128
@@ -39,20 +40,15 @@ REQUEST_DELAY = 0.11  # ~9 req/sec to stay under SEC 10/sec limit
 
 
 # --- Embedding ---
-_model = None
+@functools.lru_cache(maxsize=1)
+def _load_model():
+    from sentence_transformers import SentenceTransformer
 
-
-def get_model():
-    global _model
-    if _model is None:
-        from sentence_transformers import SentenceTransformer
-
-        _model = SentenceTransformer("BAAI/bge-small-en-v1.5")
-    return _model
+    return SentenceTransformer(MODEL_NAME)
 
 
 def embed_texts(texts: list[str]) -> np.ndarray:
-    model = get_model()
+    model = _load_model()
     return model.encode(texts, normalize_embeddings=True, show_progress_bar=True, batch_size=256)
 
 
@@ -391,12 +387,12 @@ def store_chunks(chunks: list[dict], vectors: np.ndarray) -> int:
         records.append({**chunk, "vector": vec.tolist()})
 
     try:
-        table = db.open_table("sec-edgar")
+        table = db.open_table(TABLE_NAME)
         table.add(records)
     except Exception:
-        db.create_table("sec-edgar", data=records, schema=SCHEMA)
+        db.create_table(TABLE_NAME, data=records, schema=SCHEMA)
 
-    table = db.open_table("sec-edgar")
+    table = db.open_table(TABLE_NAME)
     return table.count_rows()
 
 
@@ -513,11 +509,9 @@ def run_ingest(
     total = store_chunks(all_chunks, vectors)
     logger.info(f"Done. Total rows in LanceDB: {total}")
 
-    # Record in tracker
-    from src.tracker import record_filing
+    from src.tracker import record_filings_batch
 
-    for stat in filing_stats:
-        record_filing(**stat)
+    record_filings_batch(filing_stats)
     logger.info(f"Tracked {len(filing_stats)} filings in tracker.db")
 
 

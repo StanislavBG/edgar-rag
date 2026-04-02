@@ -46,32 +46,55 @@ def record_filing(
     accession_number: str,
     chunks_count: int,
 ) -> None:
-    """Record a successfully ingested filing."""
-    conn = get_conn()
-    # Derive quarter from filing_date (YYYY-MM-DD)
-    month = int(filing_date.split("-")[1])
-    year = filing_date.split("-")[0]
-    q = (month - 1) // 3 + 1
-    quarter = f"{year}Q{q}"
+    """Record a single ingested filing."""
+    record_filings_batch(
+        [
+            {
+                "ticker": ticker,
+                "company_name": company_name,
+                "cik": cik,
+                "filing_type": filing_type,
+                "filing_date": filing_date,
+                "accession_number": accession_number,
+                "chunks_count": chunks_count,
+            }
+        ]
+    )
 
-    conn.execute(
+
+def record_filings_batch(filings: list[dict]) -> None:
+    """Record multiple ingested filings in a single transaction."""
+    if not filings:
+        return
+    conn = get_conn()
+    now = datetime.now(timezone.utc).isoformat()
+    rows = []
+    for f in filings:
+        month = int(f["filing_date"].split("-")[1])
+        year = f["filing_date"].split("-")[0]
+        q = (month - 1) // 3 + 1
+        quarter = f"{year}Q{q}"
+        rows.append(
+            (
+                f["ticker"],
+                f["company_name"],
+                f["cik"],
+                f["filing_type"],
+                f["filing_date"],
+                quarter,
+                f["accession_number"],
+                f["chunks_count"],
+                now,
+            )
+        )
+    conn.executemany(
         """
         INSERT OR REPLACE INTO ingested
         (ticker, company_name, cik, filing_type, filing_date, quarter, accession_number,
          chunks_count, ingested_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
-        (
-            ticker,
-            company_name,
-            cik,
-            filing_type,
-            filing_date,
-            quarter,
-            accession_number,
-            chunks_count,
-            datetime.now(timezone.utc).isoformat(),
-        ),
+        rows,
     )
     conn.commit()
     conn.close()
@@ -125,15 +148,11 @@ def get_coverage_matrix() -> dict[str, dict[str, list[str]]]:
 
 def get_gaps(companies_file: str = "companies.txt") -> list[dict]:
     """Show companies from companies.txt that have no filings ingested."""
-    companies_path = Path(companies_file)
-    if not companies_path.exists():
-        return []
+    from src.ingest import load_companies
 
-    tickers = set()
-    for line in companies_path.read_text().splitlines():
-        line = line.strip()
-        if line and not line.startswith("#"):
-            tickers.add(line.upper())
+    tickers = load_companies(Path(companies_file))
+    if not tickers:
+        return []
 
     conn = get_conn()
     ingested_tickers = {

@@ -25,6 +25,10 @@ SERVER_INFO = {
     "capabilities": {"tools": {}},
 }
 
+# Derive tool schema from the Pydantic model — single source of truth
+_schema = QueryRequest.model_json_schema()
+_props = _schema.get("properties", {})
+
 TOOLS = [
     {
         "name": "search_filings",
@@ -34,42 +38,21 @@ TOOLS = [
         ),
         "inputSchema": {
             "type": "object",
-            "required": ["query"],
+            "required": _schema.get("required", ["query"]),
             "properties": {
-                "query": {
-                    "type": "string",
-                    "maxLength": 1000,
-                    "description": "Natural language search query",
-                },
-                "filing_type": {
-                    "type": "string",
-                    "enum": ["10-K", "10-Q", "8-K"],
-                    "description": "Filter by filing type",
-                },
-                "company": {
-                    "type": "string",
-                    "maxLength": 200,
-                    "description": "Filter by company name",
-                },
-                "top_k": {
-                    "type": "integer",
-                    "minimum": 1,
-                    "maximum": 20,
-                    "default": 5,
-                    "description": "Number of results to return",
-                },
+                k: {kk: vv for kk, vv in v.items() if kk != "title"} for k, v in _props.items()
             },
         },
     }
 ]
 
 
-def _jsonrpc_response(id: int | str | None, result: dict) -> dict:
-    return {"jsonrpc": "2.0", "id": id, "result": result}
+def _jsonrpc_response(req_id: int | str | None, result: dict) -> dict:
+    return {"jsonrpc": "2.0", "id": req_id, "result": result}
 
 
-def _jsonrpc_error(id: int | str | None, code: int, message: str) -> dict:
-    return {"jsonrpc": "2.0", "id": id, "error": {"code": code, "message": message}}
+def _jsonrpc_error(req_id: int | str | None, code: int, message: str) -> dict:
+    return {"jsonrpc": "2.0", "id": req_id, "error": {"code": code, "message": message}}
 
 
 @router.post("/mcp")
