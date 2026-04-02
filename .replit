@@ -1,4 +1,4 @@
-run = "pip install -r requirements.txt && python -m uvicorn src.server:app --host 0.0.0.0 --port 3000"
+run = "pip install --user -r requirements.txt && python -m uvicorn src.server:app --host 0.0.0.0 --port 3000"
 entrypoint = "src/server.py"
 language = "python3"
 disableInstallBeforeRun = true
@@ -10,8 +10,9 @@ channel = "stable-24_05"
 [env]
 PORT = "3000"
 PYTHONPATH = "/home/runner/workspace"
+PIP_USER = "1"
 
 [deployment]
-build = ["sh", "-c", "pip install -r requirements.txt"]
+build = ["sh", "-c", "pip install --user --no-cache-dir -r requirements.txt"]
 run = ["sh", "-c", "python -m uvicorn src.server:app --host 0.0.0.0 --port 3000"]
 deploymentTarget = "cloudrun"
