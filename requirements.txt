@@ -1,10 +1,7 @@
-# Runtime dependencies for Replit deployment.
-# No torch, no CUDA — uses ONNX runtime for embeddings (~50MB vs 2GB).
 fastapi>=0.115.0
 uvicorn[standard]>=0.32.0
 lancedb>=0.30.0
 onnxruntime>=1.18.0
-transformers>=4.40.0
 tokenizers>=0.19.0
 slowapi>=0.1.9
 pydantic>=2.10.0
