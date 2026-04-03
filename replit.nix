@@ -2,7 +2,6 @@
   deps = [
     pkgs.python311
     pkgs.python311Packages.pip
-    pkgs.stdenv.cc.cc.lib
   ];
   env = {
     LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [
