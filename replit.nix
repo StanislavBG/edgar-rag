@@ -1,6 +1,5 @@
 { pkgs }: {
   deps = [
-    pkgs.python311Packages.pip
     pkgs.python311
   ];
   env = {
