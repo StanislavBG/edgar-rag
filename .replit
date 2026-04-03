@@ -1,5 +1,5 @@
 entrypoint = "src/server.py"
-modules = ["python-3.11", "python3.11"]
+modules = ["python-3.11"]
 
 [nix]
 channel = "stable-24_05"
