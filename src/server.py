@@ -107,7 +107,8 @@ async def security_headers(request: Request, call_next):
 async def request_size_limit(request: Request, call_next):
     content_length = request.headers.get("content-length")
     if content_length:
-        max_size = 2 * 1024 * 1024 * 1024 if request.url.path == "/upload-vectors" else 50 * 1024
+        upload_paths = {"/upload-vectors", "/upload-vectors-chunk"}
+        max_size = 2 * 1024 * 1024 * 1024 if request.url.path in upload_paths else 50 * 1024
         if int(content_length) > max_size:
             return JSONResponse(status_code=413, content={"detail": "Request body too large"})
     return await call_next(request)
