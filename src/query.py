@@ -33,7 +33,7 @@ def _load_model():
     from huggingface_hub import hf_hub_download
     from tokenizers import Tokenizer
 
-    model_dir = hf_hub_download(repo_id=MODEL_NAME, filename="onnx/model.onnx")
+    model_dir = hf_hub_download(repo_id=MODEL_NAME, filename="onnx/model.onnx", revision="main")
     tokenizer = Tokenizer.from_pretrained(MODEL_NAME)
     tokenizer.enable_padding()
     tokenizer.enable_truncation(max_length=512)
