@@ -470,6 +470,33 @@ for result in response.json()["results"]:
             </div>
 
             <div class="endpoint">
+                <p><span class="method">POST</span> <span class="path">/v1/query/stream</span> <span class="cost">— $0.01 USDC via x402</span></p>
+                <p>Same as <code>/v1/query</code>, but streams results as Server-Sent Events (SSE) so agents can process
+                passages as they arrive. Each event is a <code>data:</code> line; the first event has <code>type=metadata</code>,
+                each subsequent event has <code>type=result</code>, and the stream terminates with <code>data: [DONE]</code>.</p>
+
+                <h3>Request Body</h3>
+                <p>Identical to <code>/v1/query</code>.</p>
+
+                <h3>Response (text/event-stream)</h3>
+<pre><code>data: {{"type":"metadata","query":"Apple revenue","result_count":3}}
+
+data: {{"type":"result","text":"...","score":0.40,"company":"Apple Inc.",...}}
+
+data: {{"type":"result","text":"...","score":0.45,"company":"Apple Inc.",...}}
+
+data: {{"type":"result","text":"...","score":0.51,"company":"Apple Inc.",...}}
+
+data: [DONE]</code></pre>
+
+                <h3>Example (curl)</h3>
+<pre><code>curl -N -X POST {base_url}/v1/query/stream \\
+  -H "Content-Type: application/json" \\
+  -d '{{"query": "Apple revenue", "top_k": 3}}'</code></pre>
+                <p style="color: var(--muted); font-size: 0.85rem;">The <code>-N</code> flag disables curl's output buffering so events print as they arrive.</p>
+            </div>
+
+            <div class="endpoint">
                 <p><span class="method">POST</span> <span class="path">/mcp</span> <span class="cost">— MCP Streamable HTTP</span></p>
                 <p>Model Context Protocol endpoint for AI agent tool discovery and execution.</p>
 
