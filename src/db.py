@@ -131,3 +131,36 @@ def search(
         }
         for r in results
     ]
+
+
+def get_filing_by_accession(accession_number: str) -> list[dict]:
+    table = get_table()
+    if table is None:
+        return []
+
+    safe = accession_number.replace("'", "''").replace("\\", "")[:50]
+    try:
+        df = (
+            table.search()
+            .where(f"accession_number = '{safe}'")
+            .limit(100)
+            .to_pandas()
+        )
+    except Exception:
+        logger.debug("Failed to query filing by accession_number")
+        return []
+
+    return [
+        {
+            "text": r.get("text", "") or "",
+            "score": 0.0,
+            "company": r.get("company_name", "") or "",
+            "cik": r.get("cik", "") or "",
+            "filing_type": r.get("filing_type", "") or "",
+            "filing_date": r.get("filing_date", "") or "",
+            "section": r.get("section", "") or "",
+            "source_url": r.get("source_url", "") or "",
+            "accession_number": r.get("accession_number", "") or "",
+        }
+        for r in df.to_dict(orient="records")
+    ]

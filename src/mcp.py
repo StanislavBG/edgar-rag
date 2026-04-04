@@ -8,11 +8,18 @@ Paid: tools/call search_filings ($0.01 via x402)
 from __future__ import annotations
 
 import logging
+import re
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
-from src.db import get_companies, get_filing_count, get_table, search
+from src.db import (
+    get_companies,
+    get_filing_by_accession,
+    get_filing_count,
+    get_table,
+    search,
+)
 from src.query import QueryRequest, embed_query
 
 logger = logging.getLogger("edgar-rag")
@@ -57,6 +64,26 @@ TOOLS = [
             "Returns company names, filing counts, and date ranges."
         ),
         "inputSchema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "get_filing",
+        "description": (
+            "Retrieve all passages from a specific SEC filing by its accession "
+            "number. Free — no payment required."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "required": ["accession_number"],
+            "properties": {
+                "accession_number": {
+                    "type": "string",
+                    "maxLength": 50,
+                    "description": (
+                        "SEC accession number, e.g. 0000320193-25-000073"
+                    ),
+                },
+            },
+        },
     },
     {
         "name": "get_data_catalog",
@@ -153,6 +180,54 @@ async def mcp_handler(request: Request) -> JSONResponse:
                     f"  Passages: {c['chunks']}\n"
                     f"  Coverage: {c['date_range']}\n\n"
                 )
+            return JSONResponse(
+                content=_jsonrpc_response(
+                    req_id, {"content": [{"type": "text", "text": text}]}
+                )
+            )
+
+        if tool_name == "get_filing":
+            accession_number = arguments.get("accession_number", "")
+            if not isinstance(accession_number, str) or len(accession_number) > 50:
+                return JSONResponse(
+                    content=_jsonrpc_error(
+                        req_id, -32602, "Invalid params: accession_number"
+                    ),
+                    status_code=400,
+                )
+            if not re.fullmatch(r"[A-Za-z0-9-]{1,50}", accession_number):
+                return JSONResponse(
+                    content=_jsonrpc_error(
+                        req_id,
+                        -32602,
+                        "Invalid params: accession_number must be alphanumeric + dashes",
+                    ),
+                    status_code=400,
+                )
+
+            passages = get_filing_by_accession(accession_number)
+            if not passages:
+                text = f"No passages found for accession number: {accession_number}\n"
+                return JSONResponse(
+                    content=_jsonrpc_response(
+                        req_id, {"content": [{"type": "text", "text": text}]}
+                    )
+                )
+
+            first = passages[0]
+            header = (
+                f"Filing: {first['company']} {first['filing_type']} "
+                f"({first['filing_date']})\n"
+                f"Source: {first['source_url']}\n\n"
+                f"Passages ({len(passages)}):\n"
+            )
+            lines = [header]
+            for i, p in enumerate(passages, 1):
+                section = p.get("section", "") or ""
+                snippet = (p.get("text", "") or "")[:300]
+                lines.append(f"{i}. [{section}] {snippet}...")
+            text = "\n".join(lines)
+
             return JSONResponse(
                 content=_jsonrpc_response(
                     req_id, {"content": [{"type": "text", "text": text}]}
