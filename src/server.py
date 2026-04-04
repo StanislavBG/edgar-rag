@@ -6,6 +6,7 @@ import os
 import shutil
 import tarfile
 import tempfile
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Annotated
@@ -29,22 +30,24 @@ from src.query import router as query_router
 logger = logging.getLogger("edgar-rag")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
-app = FastAPI(title="EDGAR RAG", version="0.1.0")
-app.include_router(query_router)
-app.include_router(mcp_router)
-app.include_router(company_router)
-app.include_router(admin_router)
-app.add_middleware(AuditMiddleware)
 
-
-@app.on_event("startup")
-async def warmup():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     """Pre-load embedding model on startup so first request is fast."""
     from src.query import embed_query
 
     logger.info("Warming up embedding model...")
     embed_query("warmup")
     logger.info("Embedding model ready")
+    yield
+
+
+app = FastAPI(title="EDGAR RAG", version="0.1.0", lifespan=lifespan)
+app.include_router(query_router)
+app.include_router(mcp_router)
+app.include_router(company_router)
+app.include_router(admin_router)
+app.add_middleware(AuditMiddleware)
 
 
 # --- x402 Payment Middleware ---
@@ -375,9 +378,15 @@ async def data_catalog(request: Request):
 
     if table is not None:
         try:
-            df = table.to_pandas(columns=[
-                "company_name", "cik", "filing_type", "filing_date", "section",
-            ])
+            df = table.to_pandas(
+                columns=[
+                    "company_name",
+                    "cik",
+                    "filing_type",
+                    "filing_date",
+                    "section",
+                ]
+            )
             companies_data = []
             for company_name in sorted(df["company_name"].unique()):
                 company_df = df[df["company_name"] == company_name]
@@ -390,11 +399,13 @@ async def data_catalog(request: Request):
                     .reset_index(name="chunks")
                     .iterrows()
                 ):
-                    filings.append({
-                        "type": row["filing_type"],
-                        "date": row["filing_date"],
-                        "chunks": int(row["chunks"]),
-                    })
+                    filings.append(
+                        {
+                            "type": row["filing_type"],
+                            "date": row["filing_date"],
+                            "chunks": int(row["chunks"]),
+                        }
+                    )
                 filings.sort(key=lambda x: x["date"], reverse=True)
 
                 sections = sorted(company_df["section"].unique().tolist())
@@ -404,15 +415,17 @@ async def data_catalog(request: Request):
                     "latest": company_df["filing_date"].max(),
                 }
 
-                companies_data.append({
-                    "name": company_name,
-                    "cik": cik,
-                    "total_chunks": len(company_df),
-                    "filing_types": filing_types,
-                    "date_range": date_range,
-                    "sections": sections,
-                    "filings": filings,
-                })
+                companies_data.append(
+                    {
+                        "name": company_name,
+                        "cik": cik,
+                        "total_chunks": len(company_df),
+                        "filing_types": filing_types,
+                        "date_range": date_range,
+                        "sections": sections,
+                        "filings": filings,
+                    }
+                )
 
             catalog = {
                 "status": "available",
@@ -438,17 +451,17 @@ def _render_data_page(request: Request, catalog: dict) -> str:
     for c in catalog.get("companies", []):
         filings_rows = ""
         for f in c["filings"]:
-            filings_rows += f'<tr><td>{f["type"]}</td><td>{f["date"]}</td><td>{f["chunks"]} passages</td></tr>'
+            filings_rows += (
+                f"<tr><td>{f['type']}</td><td>{f['date']}</td><td>{f['chunks']} passages</td></tr>"
+            )
 
-        sections_badges = " ".join(
-            f'<span class="badge">{s}</span>' for s in c.get("sections", [])
-        )
+        sections_badges = " ".join(f'<span class="badge">{s}</span>' for s in c.get("sections", []))
 
         companies_html += f"""
         <div class="company-card">
-            <h3>{c['name']} <span style="color: var(--muted); font-weight: 400;">({c['cik']})</span></h3>
-            <p>{c['total_chunks']} passages | {len(c['filings'])} filings | {c['date_range']['earliest']} to {c['date_range']['latest']}</p>
-            <p style="font-size: 0.85rem; color: var(--muted);">Filing types: {', '.join(c['filing_types'])}</p>
+            <h3>{c["name"]} <span style="color: var(--muted); font-weight: 400;">({c["cik"]})</span></h3>
+            <p>{c["total_chunks"]} passages | {len(c["filings"])} filings | {c["date_range"]["earliest"]} to {c["date_range"]["latest"]}</p>
+            <p style="font-size: 0.85rem; color: var(--muted);">Filing types: {", ".join(c["filing_types"])}</p>
             <div style="margin: 0.5rem 0;">{sections_badges}</div>
             <details>
                 <summary style="cursor: pointer; color: var(--accent); font-size: 0.85rem;">View all filings</summary>
@@ -614,11 +627,15 @@ async def upload_vectors_chunk(
     reload_db()
     filing_count = get_filing_count()
 
-    logger.info(json.dumps({
-        "event": "vectors_uploaded_chunked",
-        "filing_count": filing_count,
-        "chunks_received": total,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-    }))
+    logger.info(
+        json.dumps(
+            {
+                "event": "vectors_uploaded_chunked",
+                "filing_count": filing_count,
+                "chunks_received": total,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        )
+    )
 
     return {"status": "ok", "filings_count": filing_count}

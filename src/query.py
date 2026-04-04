@@ -37,7 +37,14 @@ def _load_model():
     tokenizer = Tokenizer.from_pretrained(MODEL_NAME)
     tokenizer.enable_padding()
     tokenizer.enable_truncation(max_length=512)
-    session = ort.InferenceSession(model_dir)
+
+    # Tuned ONNX session options for CPU inference on constrained containers
+    sess_options = ort.SessionOptions()
+    sess_options.intra_op_num_threads = 2
+    sess_options.inter_op_num_threads = 1
+    sess_options.enable_mem_pattern = True
+    sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+    session = ort.InferenceSession(model_dir, sess_options=sess_options)
     return ("onnx", session, tokenizer)
 
 
