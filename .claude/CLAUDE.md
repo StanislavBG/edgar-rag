@@ -50,3 +50,15 @@ The following files control Replit deployment. Do not modify unless you know wha
 - No abstractions until needed twice
 - data/ is in .gitignore — never commit vector data
 - query.py auto-detects runtime: sentence-transformers (local) or onnxruntime (Replit)
+
+## Admin Dashboard
+Request audit log + admin pages (all require `X-Admin-Key: $UPLOAD_SECRET` header):
+- `GET /admin` — overview dashboard (traffic, endpoints, x402 payments, latency)
+- `GET /admin/traffic` — last 100 requests with masked IPs
+- `GET /admin/queries` — query log (50-char preview, company, filing type)
+- `GET /admin/api/stats` — JSON stats for external tooling
+
+Audit log in `data/audit.db` (SQLite, gitignored). Middleware in `src/audit.py`
+logs every request except /health, /favicon.ico, /robots.txt, /static/*.
+Privacy: query previews 50 chars max, payment headers never stored,
+IPs masked to a.b.*.* on display.
