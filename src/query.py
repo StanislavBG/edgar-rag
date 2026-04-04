@@ -1,15 +1,20 @@
 from __future__ import annotations
 
 import functools
+import json
 import logging
 from pathlib import Path
 from typing import Literal, Optional
 
 import numpy as np
 from fastapi import APIRouter, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from src.db import MODEL_NAME, search
+
+_cache_stats = {"hits": 0, "misses": 0}
+_CACHE_MAX_SIZE = 256
 
 logger = logging.getLogger("edgar-rag")
 
@@ -125,14 +130,92 @@ class QueryResponse(BaseModel):
     results: list[QueryResult]
 
 
+@functools.lru_cache(maxsize=_CACHE_MAX_SIZE)
+def _cached_search(
+    query: str,
+    filing_type: str | None,
+    company: str | None,
+    top_k: int,
+) -> tuple[dict, ...]:
+    vec = embed_query(query)
+    results = search(
+        query_vector=vec,
+        top_k=top_k,
+        filing_type=filing_type,
+        company=company,
+    )
+    return tuple(results)
+
+
 @router.post("/v1/query", response_model=QueryResponse)
 async def query_filings(request: Request, body: QueryRequest) -> QueryResponse:
-    query_vector = embed_query(body.query)
-    results = search(
-        query_vector=query_vector,
-        top_k=body.top_k or 5,
-        filing_type=body.filing_type,
-        company=body.company,
-    )
+    top_k = body.top_k or 5
+    bypass = request.headers.get("x-cache-bypass", "").lower() == "true"
+
+    if bypass:
+        query_vector = embed_query(body.query)
+        results = search(
+            query_vector=query_vector,
+            top_k=top_k,
+            filing_type=body.filing_type,
+            company=body.company,
+        )
+    else:
+        info_before = _cached_search.cache_info()
+        cached = _cached_search(body.query, body.filing_type, body.company, top_k)
+        info_after = _cached_search.cache_info()
+        if info_after.hits > info_before.hits:
+            _cache_stats["hits"] += 1
+        else:
+            _cache_stats["misses"] += 1
+        # Return copies so callers can't mutate cached dicts
+        results = [dict(r) for r in cached]
+
     typed = [QueryResult(**r) for r in results]
     return QueryResponse(query=body.query, result_count=len(typed), results=typed)
+
+
+@router.post("/v1/query/stream")
+async def query_stream(request: Request, body: QueryRequest) -> StreamingResponse:
+    top_k = body.top_k or 5
+
+    async def generate():
+        query_vector = embed_query(body.query)
+        results = search(
+            query_vector=query_vector,
+            top_k=top_k,
+            filing_type=body.filing_type,
+            company=body.company,
+        )
+        metadata = {
+            "type": "metadata",
+            "query": body.query,
+            "result_count": len(results),
+        }
+        yield f"data: {json.dumps(metadata)}\n\n"
+        for r in results:
+            payload = {"type": "result", **r}
+            yield f"data: {json.dumps(payload)}\n\n"
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@router.get("/v1/query/cache-stats")
+async def query_cache_stats() -> dict:
+    info = _cached_search.cache_info()
+    hits = _cache_stats["hits"]
+    misses = _cache_stats["misses"]
+    total = hits + misses
+    hit_rate = (hits / total) if total > 0 else 0.0
+    return {
+        "hits": hits,
+        "misses": misses,
+        "hit_rate": round(hit_rate, 4),
+        "cache_size": info.currsize,
+        "max_size": info.maxsize,
+    }
