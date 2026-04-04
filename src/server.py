@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, UploadFile
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
@@ -123,8 +123,7 @@ def _base_url(request: Request) -> str:
     return str(request.base_url).rstrip("/")
 
 
-@app.get("/")
-async def root(request: Request) -> dict:
+def _build_api_data(request: Request) -> dict:
     filing_count = get_filing_count()
     companies = get_companies()
     base = _base_url(request)
@@ -301,6 +300,28 @@ async def root(request: Request) -> dict:
         },
         "source_code": "https://github.com/StanislavBG/edgar-rag",
     }
+
+
+@app.get("/")
+async def root(request: Request):
+    """Serve HTML to browsers, JSON to agents."""
+    accept = request.headers.get("accept", "")
+    if "text/html" in accept:
+        from src.landing import render_landing
+
+        filing_count = get_filing_count()
+        companies = get_companies()
+        base = _base_url(request)
+        tool_schema = QueryRequest.model_json_schema()
+        html = render_landing(base, filing_count, companies, tool_schema)
+        return HTMLResponse(content=html)
+    return _build_api_data(request)
+
+
+@app.get("/api")
+async def api_docs(request: Request) -> dict:
+    """Machine-readable JSON API documentation."""
+    return _build_api_data(request)
 
 
 @app.get("/health")
