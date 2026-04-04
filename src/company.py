@@ -25,6 +25,76 @@ COMPANIES = {
         "sector": "Technology",
         "description": "Consumer electronics, software, and services",
     },
+    "microsoft": {
+        "name": "Microsoft Corp",
+        "ticker": "MSFT",
+        "cik": "0000789019",
+        "sector": "Technology",
+        "description": "Software, cloud computing, and enterprise services",
+    },
+    "google": {
+        "name": "Alphabet Inc.",
+        "ticker": "GOOGL",
+        "cik": "0001652044",
+        "sector": "Technology",
+        "description": "Search, advertising, cloud, and AI",
+    },
+    "amazon": {
+        "name": "Amazon.com Inc",
+        "ticker": "AMZN",
+        "cik": "0001018724",
+        "sector": "Technology",
+        "description": "E-commerce, cloud (AWS), and digital services",
+    },
+    "nvidia": {
+        "name": "NVIDIA Corp",
+        "ticker": "NVDA",
+        "cik": "0001045810",
+        "sector": "Technology",
+        "description": "GPUs, AI accelerators, and data center computing",
+    },
+    "tesla": {
+        "name": "Tesla Inc",
+        "ticker": "TSLA",
+        "cik": "0001318605",
+        "sector": "Automotive",
+        "description": "Electric vehicles, energy storage, and solar",
+    },
+    "meta": {
+        "name": "Meta Platforms Inc",
+        "ticker": "META",
+        "cik": "0001326801",
+        "sector": "Technology",
+        "description": "Social media, advertising, VR/AR, and AI",
+    },
+    "jpmorgan": {
+        "name": "JPMorgan Chase & Co",
+        "ticker": "JPM",
+        "cik": "0000019617",
+        "sector": "Finance",
+        "description": "Investment banking, commercial banking, asset management",
+    },
+    "goldman": {
+        "name": "Goldman Sachs Group Inc",
+        "ticker": "GS",
+        "cik": "0000886982",
+        "sector": "Finance",
+        "description": "Investment banking, trading, and asset management",
+    },
+    "visa": {
+        "name": "Visa Inc",
+        "ticker": "V",
+        "cik": "0001403161",
+        "sector": "Finance",
+        "description": "Payment technology and digital payments network",
+    },
+    "jnj": {
+        "name": "Johnson & Johnson",
+        "ticker": "JNJ",
+        "cik": "0000200406",
+        "sector": "Healthcare",
+        "description": "Pharmaceuticals, medical devices, and consumer health",
+    },
 }
 
 SECTIONS = [
@@ -294,6 +364,60 @@ def render_company_page(request: Request, slug: str) -> str | None:
     </div>
 </body>
 </html>"""
+
+
+@router.get("/companies")
+async def companies_list(request: Request):
+    """List all available company profile pages."""
+    base = str(request.base_url).rstrip("/")
+    total = get_filing_count()
+
+    cards = ""
+    for slug, c in COMPANIES.items():
+        cards += f"""
+        <a href="{base}/company/{slug}" style="text-decoration: none; color: inherit;">
+            <div class="company-card">
+                <h3>{c['name']} <span style="color: var(--muted);">({c['ticker']})</span></h3>
+                <p>{c['sector']} — {c['description']}</p>
+            </div>
+        </a>"""
+
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Companies — EDGAR RAG SEC Filing Search</title>
+    <meta name="description" content="Browse SEC filing data for {len(COMPANIES)} public companies. Revenue, margins, risk factors from 10-K, 10-Q, 8-K filings.">
+    <style>
+        :root {{ --bg: #0a0a0a; --surface: #141414; --border: #262626; --text: #e5e5e5; --muted: #a3a3a3; --accent: #3b82f6; }}
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.7; }}
+        .container {{ max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem; }}
+        h1 {{ font-size: 2rem; font-weight: 700; margin-bottom: 0.5rem; }}
+        h3 {{ font-size: 1.1rem; margin: 0 0 0.25rem; }}
+        p {{ color: var(--muted); margin: 0; }}
+        a {{ color: var(--accent); }}
+        .nav {{ margin-bottom: 1.5rem; font-size: 0.85rem; }}
+        .badge {{ display: inline-block; padding: 0.15rem 0.5rem; background: var(--surface); border: 1px solid #f59e0b44; border-radius: 6px; font-size: 0.75rem; color: #f59e0b; }}
+        .company-card {{ background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; margin: 0.75rem 0; transition: border-color 0.2s; }}
+        .company-card:hover {{ border-color: var(--accent); }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="nav"><a href="{base}/">EDGAR RAG</a> / <a href="{base}/companies">Companies</a></div>
+        <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem;">
+            <h1>Companies</h1>
+            <span class="badge">Alpha — {len(COMPANIES)} companies</span>
+        </div>
+        <p style="color: var(--text); margin-bottom: 1.5rem;">{total:,} passages indexed from SEC EDGAR filings. Click a company to see its financial data.</p>
+        {cards}
+        <p style="margin-top: 2rem; font-size: 0.85rem;"><a href="{base}/data">View full data catalog</a> | <a href="mailto:bilko@bilko.run">Request a company</a></p>
+    </div>
+</body>
+</html>"""
+    return HTMLResponse(content=html)
 
 
 @router.get("/company/{slug}")

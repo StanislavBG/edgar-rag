@@ -1,0 +1,13 @@
+# Alpha batch: 10 high-demand companies + Apple (already indexed)
+# 5 years of data (2021-2026)
+AAPL
+MSFT
+GOOGL
+AMZN
+NVDA
+TSLA
+META
+JPM
+GS
+V
+JNJ
