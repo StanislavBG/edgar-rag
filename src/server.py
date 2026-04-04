@@ -17,6 +17,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
+from src.company import router as company_router
 from src.db import DATA_DIR, get_companies, get_filing_count, reload_db
 from src.mcp import TOOLS
 from src.mcp import router as mcp_router
@@ -29,6 +30,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 app = FastAPI(title="EDGAR RAG", version="0.1.0")
 app.include_router(query_router)
 app.include_router(mcp_router)
+app.include_router(company_router)
 
 
 # --- x402 Payment Middleware ---
