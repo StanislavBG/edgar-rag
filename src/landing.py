@@ -171,10 +171,20 @@ def render_landing(
 </head>
 <body>
     <div class="container">
+        <!-- ALPHA Banner -->
+        <div style="background: linear-gradient(90deg, #f59e0b22, #f59e0b11); border: 1px solid #f59e0b66; border-radius: 12px; padding: 1.25rem 1.5rem; margin-bottom: 2rem;">
+            <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+                <span style="background: #f59e0b; color: #000; font-weight: 800; font-size: 0.75rem; padding: 0.2rem 0.6rem; border-radius: 4px; letter-spacing: 0.05em;">ALPHA</span>
+                <span style="color: #fbbf24; font-weight: 600;">Early access — we're looking for feedback from agent builders</span>
+            </div>
+            <p style="color: #d4a44a; margin: 0.5rem 0 0; font-size: 0.9rem;">Currently indexing Apple (AAPL) SEC filings from 2024-2026. Building toward S&amp;P 500 coverage. <a href="mailto:bilko@bilko.run" style="color: #fbbf24;">Get in touch</a> if you're building a trading agent and want early access to specific companies.</p>
+        </div>
+
         <header>
             <h1>EDGAR RAG</h1>
             <p class="tagline">SEC filings for AI agents. $0.01 per query. No account needed.</p>
             <div>
+                <span class="badge" style="border-color: #f59e0b; color: #f59e0b;">Alpha</span>
                 <span class="badge live">Live</span>
                 <span class="badge">x402 Micropayments</span>
                 <span class="badge">MCP Compatible</span>
@@ -200,6 +210,54 @@ def render_landing(
                 <div class="stat-label">Response time</div>
             </div>
         </div>
+
+        <!-- Roadmap -->
+        <section class="section">
+            <h2>Roadmap</h2>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
+
+                <div style="background: linear-gradient(135deg, #f59e0b15, #f59e0b08); border: 1px solid #f59e0b44; border-radius: 12px; padding: 1.5rem; position: relative;">
+                    <span style="background: #f59e0b; color: #000; font-weight: 800; font-size: 0.65rem; padding: 0.15rem 0.5rem; border-radius: 3px; letter-spacing: 0.05em; position: absolute; top: 1rem; right: 1rem;">NOW</span>
+                    <h3 style="color: #fbbf24; margin-top: 0;">Alpha</h3>
+                    <ul style="color: var(--muted); margin: 0.5rem 0 0 1.25rem; font-size: 0.9rem; line-height: 1.8;">
+                        <li>Apple (AAPL) — 2 years of 10-K, 10-Q, 8-K</li>
+                        <li>Semantic search + metadata filters</li>
+                        <li>x402 micropayments on Base L2</li>
+                        <li>MCP endpoint for agent discovery</li>
+                        <li>Feedback-driven iteration</li>
+                    </ul>
+                    <p style="color: #d4a44a; font-size: 0.85rem; margin-bottom: 0;">We're working directly with early agent builders. <a href="mailto:bilko@bilko.run" style="color: #fbbf24;">Tell us what you need.</a></p>
+                </div>
+
+                <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; position: relative;">
+                    <span style="background: var(--accent); color: #fff; font-weight: 800; font-size: 0.65rem; padding: 0.15rem 0.5rem; border-radius: 3px; letter-spacing: 0.05em; position: absolute; top: 1rem; right: 1rem;">NEXT</span>
+                    <h3 style="color: var(--accent); margin-top: 0;">Beta</h3>
+                    <ul style="color: var(--muted); margin: 0.5rem 0 0 1.25rem; font-size: 0.9rem; line-height: 1.8;">
+                        <li><strong>S&amp;P 500 companies</strong> — full coverage</li>
+                        <li><strong>10 years</strong> of filing history</li>
+                        <li>Section-level chunking (Item 1A, Item 7, etc.)</li>
+                        <li>Company comparison queries</li>
+                        <li>Semantic caching for repeat queries</li>
+                        <li>Listed in MCP Registry + GitHub MCP Registry</li>
+                    </ul>
+                </div>
+
+                <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; position: relative;">
+                    <span style="background: #525252; color: #fff; font-weight: 800; font-size: 0.65rem; padding: 0.15rem 0.5rem; border-radius: 3px; letter-spacing: 0.05em; position: absolute; top: 1rem; right: 1rem;">FUTURE</span>
+                    <h3 style="color: var(--muted); margin-top: 0;">General Availability</h3>
+                    <ul style="color: var(--muted); margin: 0.5rem 0 0 1.25rem; font-size: 0.9rem; line-height: 1.8;">
+                        <li><strong>All public companies</strong> on SEC EDGAR</li>
+                        <li><strong>20+ years</strong> of filing history</li>
+                        <li>arXiv research papers</li>
+                        <li>USPTO patent filings</li>
+                        <li>Hybrid retrieval (vector + BM25)</li>
+                        <li>Re-ranking for precision</li>
+                        <li>Google A2A protocol support</li>
+                    </ul>
+                </div>
+
+            </div>
+        </section>
 
         <section class="section">
             <h2>What is EDGAR RAG?</h2>
@@ -507,6 +565,40 @@ for result in response.json()["results"]:
                 <tr><td>Rate limit</td><td>60 requests per minute per IP</td></tr>
                 <tr><td>Security</td><td>HSTS, input validation (Pydantic), fail-closed payments</td></tr>
             </table>
+        </section>
+
+        <!-- CTA -->
+        <section class="section" style="background: linear-gradient(135deg, #1a1a2e 0%, #0f172a 100%); border: 1px solid var(--accent); border-radius: 16px; padding: 2.5rem; text-align: center;">
+            <h2 style="color: var(--text); margin-top: 0; font-size: 1.75rem;">Build Your Trading Agent Today</h2>
+            <p style="color: var(--muted); font-size: 1.1rem; max-width: 600px; margin: 1rem auto;">
+                No signup. No API keys. Point your agent at the endpoint and start querying. Pay only for what you use.
+            </p>
+            <div style="margin: 2rem 0;">
+<pre style="display: inline-block; text-align: left; max-width: 600px;"><code>curl -X POST {base_url}/v1/query \\
+  -H "Content-Type: application/json" \\
+  -d '{{"query": "Apple revenue by segment", "top_k": 3}}'</code></pre>
+            </div>
+            <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; margin-top: 1.5rem;">
+                <a href="{base_url}/api" style="background: var(--accent); color: white; padding: 0.75rem 1.5rem; border-radius: 8px; font-weight: 600; text-decoration: none;">View API Docs (JSON)</a>
+                <a href="{base_url}/health" style="background: var(--surface); color: var(--text); padding: 0.75rem 1.5rem; border-radius: 8px; font-weight: 600; text-decoration: none; border: 1px solid var(--border);">Check Status</a>
+                <a href="mailto:bilko@bilko.run" style="background: var(--surface); color: var(--text); padding: 0.75rem 1.5rem; border-radius: 8px; font-weight: 600; text-decoration: none; border: 1px solid var(--border);">Request a Company</a>
+            </div>
+        </section>
+
+        <!-- Early Adopter Callout -->
+        <section class="section" style="background: linear-gradient(135deg, #22c55e10, #22c55e05); border: 1px solid #22c55e33; border-radius: 16px; padding: 2rem;">
+            <h2 style="color: var(--green); margin-top: 0;">Alpha Testers Wanted</h2>
+            <p style="color: var(--text);">
+                We're looking for agent builders who want to shape this product. If you're building a trading bot, research agent, compliance tool, or any AI that needs financial data — we want to hear from you.
+            </p>
+            <p style="color: var(--muted);">What we're offering early adopters:</p>
+            <ul style="color: var(--muted); margin: 0.5rem 0 1rem 1.5rem; line-height: 2;">
+                <li><strong>Priority company indexing</strong> — tell us which companies your agent needs, we'll add them first</li>
+                <li><strong>Direct support</strong> — we'll help you integrate and debug your agent's queries</li>
+                <li><strong>Influence the roadmap</strong> — your use case drives what we build next</li>
+                <li><strong>Locked-in $0.01 pricing</strong> — alpha pricing stays when we scale</li>
+            </ul>
+            <p style="margin-bottom: 0;"><a href="mailto:bilko@bilko.run" style="color: var(--green); font-weight: 600;">bilko@bilko.run</a> — tell us what you're building</p>
         </section>
 
         <hr class="divider">
