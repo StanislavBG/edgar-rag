@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import functools
 import logging
+from pathlib import Path
 from typing import Literal, Optional
 
 import numpy as np
@@ -13,6 +14,10 @@ from src.db import MODEL_NAME, search
 logger = logging.getLogger("edgar-rag")
 
 router = APIRouter()
+
+LOCAL_MODEL_DIR = Path("models/bge-small-en-v1.5")
+LOCAL_MODEL_ONNX = LOCAL_MODEL_DIR / "onnx" / "model.onnx"
+LOCAL_MODEL_TOKENIZER = LOCAL_MODEL_DIR / "tokenizer.json"
 
 
 @functools.lru_cache(maxsize=1)
@@ -28,13 +33,25 @@ def _load_model():
     except ImportError:
         pass
 
-    logger.info("Loading embedding model via ONNX runtime")
     import onnxruntime as ort
-    from huggingface_hub import hf_hub_download
     from tokenizers import Tokenizer
 
-    model_dir = hf_hub_download(repo_id=MODEL_NAME, filename="onnx/model.onnx", revision="main")
-    tokenizer = Tokenizer.from_pretrained(MODEL_NAME)
+    if LOCAL_MODEL_ONNX.exists() and LOCAL_MODEL_TOKENIZER.exists():
+        logger.info(
+            "Loading embedding model via ONNX runtime (loading from local path %s)",
+            LOCAL_MODEL_DIR,
+        )
+        model_path = str(LOCAL_MODEL_ONNX)
+        tokenizer = Tokenizer.from_file(str(LOCAL_MODEL_TOKENIZER))
+    else:
+        logger.info("Loading embedding model via ONNX runtime (downloading from HuggingFace Hub)")
+        from huggingface_hub import hf_hub_download
+
+        model_path = hf_hub_download(
+            repo_id=MODEL_NAME, filename="onnx/model.onnx", revision="main"
+        )
+        tokenizer = Tokenizer.from_pretrained(MODEL_NAME)
+
     tokenizer.enable_padding()
     tokenizer.enable_truncation(max_length=512)
 
@@ -44,7 +61,7 @@ def _load_model():
     sess_options.inter_op_num_threads = 1
     sess_options.enable_mem_pattern = True
     sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
-    session = ort.InferenceSession(model_dir, sess_options=sess_options)
+    session = ort.InferenceSession(model_path, sess_options=sess_options)
     return ("onnx", session, tokenizer)
 
 
