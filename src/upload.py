@@ -19,7 +19,7 @@ from dotenv import load_dotenv
 
 from src.db import DATA_DIR
 
-MAX_CHUNK_MB = 25
+MAX_CHUNK_MB = 10
 
 
 def main() -> None:
