@@ -11,9 +11,16 @@ def render_landing(
     filing_count: int,
     companies: list[str],
     tool_schema: dict,
+    is_admin: bool = False,
 ) -> str:
     companies_html = ", ".join(companies) if companies else "Loading first batch..."
     company_count = len(companies) if companies else 0
+    admin_link = (
+        f'<a href="{base_url}/admin" style="color:#fbbf24;margin-left:0.5rem;">[admin]</a>'
+        if is_admin
+        else ""
+    )
+    _ = admin_link  # referenced in template below
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -181,7 +188,7 @@ def render_landing(
         </div>
 
         <header>
-            <h1>EDGAR RAG</h1>
+            <h1>EDGAR RAG{admin_link}</h1>
             <p class="tagline">SEC filings for AI agents. $0.01 per query. No account needed.</p>
             <div>
                 <span class="badge" style="border-color: #f59e0b; color: #f59e0b;">Alpha</span>

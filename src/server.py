@@ -17,6 +17,8 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
+from src.audit import AuditMiddleware
+from src.audit import router as admin_router
 from src.company import router as company_router
 from src.db import DATA_DIR, get_companies, get_filing_count, reload_db
 from src.mcp import TOOLS
@@ -31,6 +33,8 @@ app = FastAPI(title="EDGAR RAG", version="0.1.0")
 app.include_router(query_router)
 app.include_router(mcp_router)
 app.include_router(company_router)
+app.include_router(admin_router)
+app.add_middleware(AuditMiddleware)
 
 
 @app.on_event("startup")
@@ -338,7 +342,10 @@ async def root(request: Request):
         companies = get_companies()
         base = _base_url(request)
         tool_schema = QueryRequest.model_json_schema()
-        html = render_landing(base, filing_count, companies, tool_schema)
+        admin_key = request.headers.get("x-admin-key", "")
+        expected = os.environ.get("UPLOAD_SECRET", "")
+        is_admin = bool(admin_key and expected and admin_key == expected)
+        html = render_landing(base, filing_count, companies, tool_schema, is_admin=is_admin)
         return HTMLResponse(content=html)
     return _build_api_data(request)
 
