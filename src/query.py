@@ -96,6 +96,8 @@ class QueryResult(BaseModel):
 
 
 class QueryResponse(BaseModel):
+    query: str
+    result_count: int
     results: list[QueryResult]
 
 
@@ -108,4 +110,5 @@ async def query_filings(request: Request, body: QueryRequest) -> QueryResponse:
         filing_type=body.filing_type,
         company=body.company,
     )
-    return QueryResponse(results=[QueryResult(**r) for r in results])
+    typed = [QueryResult(**r) for r in results]
+    return QueryResponse(query=body.query, result_count=len(typed), results=typed)
