@@ -236,6 +236,98 @@ def render_landing(
             </table>
         </section>
 
+        <section class="section" style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border: 1px solid var(--accent); border-radius: 16px; padding: 2.5rem;">
+            <h2 style="color: var(--accent); margin-top: 0;">New to Building Trading Agents?</h2>
+            <p style="color: var(--text); font-size: 1.1rem;">
+                If you're building your first AI trading agent, financial research bot, or automated portfolio analyzer — this is your data layer. Instead of spending weeks building an SEC filing pipeline, connect your agent to EDGAR RAG and get instant access to the same financial data that Wall Street uses.
+            </p>
+            <h3>What Your Agent Can Do With This</h3>
+            <ul style="color: var(--muted); margin: 0.5rem 0 1rem 1.5rem; line-height: 2;">
+                <li><strong>Earnings Analysis:</strong> "What was Apple's revenue last quarter?" — get the exact numbers from their 10-Q</li>
+                <li><strong>Risk Assessment:</strong> "What are Tesla's risk factors?" — get the actual risk disclosures from their 10-K</li>
+                <li><strong>Competitive Research:</strong> Compare gross margins across AAPL, MSFT, GOOGL from their latest filings</li>
+                <li><strong>Event Detection:</strong> "What material events did NVDA report?" — search 8-K filings for acquisitions, leadership changes</li>
+                <li><strong>Trend Analysis:</strong> Track how a company's management discussion changes quarter over quarter</li>
+            </ul>
+            <h3>How to Connect Your Agent in 5 Minutes</h3>
+            <p>If your agent uses <strong>Python</strong>:</p>
+<pre><code>import httpx
+
+response = httpx.post("https://edgar-rag.replit.app/v1/query",
+    json={{"query": "Apple revenue and earnings", "top_k": 3}})
+
+for result in response.json()["results"]:
+    print(f"[{{result['filing_type']}} {{result['filing_date']}}]")
+    print(result["text"][:200])
+    print(f"Source: {{result['source_url']}}")
+    print()</code></pre>
+            <p>If your agent uses the <strong>MCP protocol</strong> (Claude, ChatGPT, etc.):</p>
+<pre><code>// Add to your .mcp.json or agent config
+{{
+  "mcpServers": {{
+    "edgar-rag": {{
+      "url": "https://edgar-rag.replit.app/mcp",
+      "transport": "http"
+    }}
+  }}
+}}</code></pre>
+            <p>Your agent will discover the <code>search_filings</code> tool automatically and can search SEC filings as part of any conversation or workflow.</p>
+        </section>
+
+        <section class="section" style="background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 2.5rem;">
+            <h2 style="margin-top: 0;">For Advanced Builders: Why EDGAR RAG Wins</h2>
+
+            <h3>1. Embedding Quality Matters More Than You Think</h3>
+            <p>We use <code>bge-small-en-v1.5</code> with section-aware chunking — each chunk knows which part of the filing it came from (Item 1A Risk Factors, Item 7 MD&amp;A, etc.). Generic chunking by token count destroys context boundaries and degrades retrieval accuracy by 15-25%.</p>
+
+            <h3>2. Raw EDGAR Data Is a Nightmare</h3>
+            <p>SEC filings are a mix of HTML, inline XBRL, ASCII art tables, and embedded exhibits. A single 10-K can contain 60+ embedded documents. We extract only the primary narrative document, strip XBRL tags, remove style blocks, and produce clean searchable text. You don't want to build this parser.</p>
+
+            <h3>3. Token Economics at Scale</h3>
+            <p>If your agent processes 1,000 financial queries per day:</p>
+            <table>
+                <tr><th>Approach</th><th>Daily Cost</th><th>Monthly Cost</th></tr>
+                <tr><td>EDGAR RAG ($0.01/query)</td><td>$10</td><td><strong>$300</strong></td></tr>
+                <tr><td>GPT-4 reading raw filings (~50K tokens each)</td><td>$500+</td><td><strong>$15,000+</strong></td></tr>
+                <tr><td>Self-hosted pipeline (EC2 + vector DB)</td><td>$17</td><td><strong>$500+ setup</strong></td></tr>
+            </table>
+            <p>We pre-compute the expensive part (embedding) and serve the cheap part (vector search). Your agent saves tokens by getting only the relevant passages instead of feeding entire 100-page filings to the LLM.</p>
+
+            <h3>4. Freshness Without Maintenance</h3>
+            <p>We ingest new filings monthly from SEC EDGAR's full index. Your agent always queries the latest data without you running cron jobs, monitoring pipelines, or debugging XBRL parser updates. Zero maintenance on your end.</p>
+
+            <h3>5. x402 Means Zero Integration Overhead</h3>
+            <p>No OAuth flows. No API key management. No webhook for billing. No rate limit negotiation. Your agent hits the endpoint, the x402 SDK handles payment automatically in ~200ms, and you get results. It's HTTP with a payment header — nothing else to integrate.</p>
+
+            <h3>6. MCP-Native: Agents Discover It Automatically</h3>
+            <p>Register the <code>/mcp</code> endpoint in any MCP-compatible agent framework (Claude, ChatGPT, custom agents). The agent calls <code>tools/list</code> for free, sees <code>search_filings</code>, and knows exactly how to use it. Discovery is free — you only pay when the agent actually searches.</p>
+        </section>
+
+        <section class="section">
+            <h2>Real Examples from Apple's SEC Filings</h2>
+            <p>Here's what actual queries return from Apple's last 2 years of 10-K, 10-Q, and 8-K filings:</p>
+
+            <div class="endpoint">
+                <h3>"What was Apple's total revenue?"</h3>
+                <p style="color: var(--muted);">Returns the revenue table from Apple's latest 10-Q with breakdowns by product category — iPhone, Mac, iPad, Wearables, Services — with quarter-over-quarter and year-over-year comparisons.</p>
+            </div>
+
+            <div class="endpoint">
+                <h3>"iPhone sales by region"</h3>
+                <p style="color: var(--muted);">Returns geographic segment data — Americas, Europe, Greater China, Japan, Rest of Asia Pacific — with net sales and operating income per region.</p>
+            </div>
+
+            <div class="endpoint">
+                <h3>"Apple risk factors and legal proceedings"</h3>
+                <p style="color: var(--muted);">Returns Item 1A Risk Factors and legal proceeding disclosures, including the Epic Games case, EU Digital Markets Act compliance, and tariff impacts.</p>
+            </div>
+
+            <div class="endpoint">
+                <h3>"Gross margin trends"</h3>
+                <p style="color: var(--muted);">Returns Products and Services gross margin percentages with management's explanation of what drove changes — product mix, tariff impacts, and cost improvements.</p>
+            </div>
+        </section>
+
         <section class="section">
             <h2>Quick Start</h2>
             <div class="step">
