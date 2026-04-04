@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, UploadFile
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse
 from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
@@ -22,6 +23,7 @@ from src.audit import AuditMiddleware
 from src.audit import router as admin_router
 from src.company import router as company_router
 from src.db import DATA_DIR, get_companies, get_filing_count, reload_db
+from src.errors import ErrorCode, make_error
 from src.mcp import TOOLS
 from src.mcp import router as mcp_router
 from src.query import QueryRequest
@@ -113,9 +115,69 @@ app.state.limiter = limiter
 
 @app.exception_handler(RateLimitExceeded)
 async def rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
-    return JSONResponse(
+    return make_error(
+        code=ErrorCode.RATE_LIMIT_EXCEEDED,
+        message="Rate limit exceeded. 60 requests per minute.",
+        retry=True,
         status_code=429,
-        content={"detail": "Rate limit exceeded. 60 requests per minute."},
+    )
+
+
+def _map_validation_error(err: dict) -> tuple[ErrorCode, str, str | None]:
+    """Map a single Pydantic validation error dict to (code, message, field)."""
+    loc = err.get("loc", ())
+    # Skip the first element if it's the body/path/header marker (not "query" — that's a field name)
+    field_parts = [str(p) for p in loc if p not in ("body", "path", "header", "cookie")]
+    field = field_parts[-1] if field_parts else None
+    err_type = err.get("type", "")
+    msg = err.get("msg", "")
+
+    if err_type in ("extra_forbidden",) or "extra" in err_type or "forbidden" in err_type:
+        return (
+            ErrorCode.UNKNOWN_FIELDS,
+            f"Unknown field not allowed: {field}" if field else "Unknown fields not allowed",
+            field,
+        )
+    if field == "filing_type" and err_type == "literal_error":
+        return (
+            ErrorCode.INVALID_FILING_TYPE,
+            "filing_type must be one of: 10-K, 10-Q, 8-K",
+            field,
+        )
+    if field == "query" and ("at most 1000" in msg or err_type == "string_too_long"):
+        return (
+            ErrorCode.QUERY_TOO_LONG,
+            "query must be at most 1000 characters",
+            field,
+        )
+    if field == "query" and ("at least 1" in msg or err_type == "string_too_short"):
+        return (
+            ErrorCode.QUERY_EMPTY,
+            "query must not be empty",
+            field,
+        )
+    if field == "top_k":
+        return (
+            ErrorCode.TOP_K_OUT_OF_RANGE,
+            "top_k must be between 1 and 20",
+            field,
+        )
+    return (ErrorCode.INTERNAL_ERROR, msg or "Validation error", field)
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    errors = exc.errors()
+    if errors:
+        code, message, field = _map_validation_error(errors[0])
+    else:
+        code, message, field = ErrorCode.INTERNAL_ERROR, "Validation error", None
+    return make_error(
+        code=code,
+        message=message,
+        retry=False,
+        status_code=422,
+        field=field,
     )
 
 
@@ -139,7 +201,12 @@ async def request_size_limit(request: Request, call_next):
         upload_paths = {"/upload-vectors", "/upload-vectors-chunk"}
         max_size = 2 * 1024 * 1024 * 1024 if request.url.path in upload_paths else 50 * 1024
         if int(content_length) > max_size:
-            return JSONResponse(status_code=413, content={"detail": "Request body too large"})
+            return make_error(
+                code=ErrorCode.REQUEST_TOO_LARGE,
+                message="Request body too large",
+                retry=False,
+                status_code=413,
+            )
     return await call_next(request)
 
 
