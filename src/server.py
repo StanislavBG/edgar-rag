@@ -525,3 +525,70 @@ async def upload_vectors(
     )
 
     return {"status": "ok", "filings_count": filing_count}
+
+
+# Chunked upload state
+_chunk_dir: Path | None = None
+
+
+@app.post("/upload-vectors-chunk")
+async def upload_vectors_chunk(
+    file: UploadFile,
+    _auth: Annotated[None, Depends(verify_upload_token)],
+    x_chunk_index: Annotated[str, Header()],
+    x_chunk_total: Annotated[str, Header()],
+    x_chunk_final: Annotated[str, Header()],
+) -> dict:
+    """Receive chunked uploads for large vector datasets."""
+    global _chunk_dir
+    if _chunk_dir is None or not _chunk_dir.exists():
+        _chunk_dir = Path(tempfile.mkdtemp(prefix="edgar-chunks-"))
+
+    chunk_path = _chunk_dir / f"chunk_{x_chunk_index}"
+    with open(chunk_path, "wb") as f:
+        while data := await file.read(1024 * 1024):
+            f.write(data)
+
+    if x_chunk_final != "true":
+        return {"status": "ok", "chunk": int(x_chunk_index), "received": True}
+
+    # Reassemble and extract
+    total = int(x_chunk_total)
+    assembled = _chunk_dir / "vectors.tar.gz"
+    with open(assembled, "wb") as out:
+        for i in range(total):
+            cp = _chunk_dir / f"chunk_{i}"
+            with open(cp, "rb") as inp:
+                out.write(inp.read())
+
+    extract_dir = _chunk_dir / "extracted"
+    extract_dir.mkdir()
+    with tarfile.open(str(assembled), "r:gz") as tar:
+        tar.extractall(extract_dir, filter="data")
+
+    extracted_vectors = extract_dir / "vectors"
+    if not extracted_vectors.exists():
+        for item in extract_dir.iterdir():
+            if item.is_dir():
+                extracted_vectors = item
+                break
+
+    DATA_DIR.parent.mkdir(parents=True, exist_ok=True)
+    if DATA_DIR.exists():
+        shutil.rmtree(DATA_DIR)
+    shutil.move(str(extracted_vectors), str(DATA_DIR))
+
+    shutil.rmtree(_chunk_dir, ignore_errors=True)
+    _chunk_dir = None
+
+    reload_db()
+    filing_count = get_filing_count()
+
+    logger.info(json.dumps({
+        "event": "vectors_uploaded_chunked",
+        "filing_count": filing_count,
+        "chunks_received": total,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }))
+
+    return {"status": "ok", "filings_count": filing_count}
