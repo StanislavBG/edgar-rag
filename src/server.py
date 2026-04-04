@@ -33,6 +33,16 @@ app.include_router(mcp_router)
 app.include_router(company_router)
 
 
+@app.on_event("startup")
+async def warmup():
+    """Pre-load embedding model on startup so first request is fast."""
+    from src.query import embed_query
+
+    logger.info("Warming up embedding model...")
+    embed_query("warmup")
+    logger.info("Embedding model ready")
+
+
 # --- x402 Payment Middleware ---
 def _setup_x402() -> None:
     wallet = os.environ.get("WALLET_ADDRESS", "")
@@ -77,6 +87,18 @@ def _setup_x402() -> None:
 
 
 _setup_x402()
+
+
+@app.middleware("http")
+async def admin_bypass(request: Request, call_next):
+    """Allow admin requests to bypass x402 payment for testing."""
+    admin_key = request.headers.get("x-admin-key", "")
+    expected = os.environ.get("UPLOAD_SECRET", "")
+    if admin_key and expected and admin_key == expected:
+        # Strip the x402 payment requirement by marking as pre-paid
+        request.state.x402_bypass = True
+    return await call_next(request)
+
 
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter

@@ -9,3 +9,4 @@ dist/
 .env
 uv.lock
 pyproject.toml
+models/
