@@ -220,13 +220,18 @@ def render_landing(
                     <span style="background: #f59e0b; color: #000; font-weight: 800; font-size: 0.65rem; padding: 0.15rem 0.5rem; border-radius: 3px; letter-spacing: 0.05em; position: absolute; top: 1rem; right: 1rem;">NOW</span>
                     <h3 style="color: #fbbf24; margin-top: 0;">Alpha</h3>
                     <ul style="color: var(--muted); margin: 0.5rem 0 0 1.25rem; font-size: 0.9rem; line-height: 1.8;">
-                        <li>Apple (AAPL) — 2 years of 10-K, 10-Q, 8-K</li>
+                        <li><a href="{base_url}/company/apple" style="color: #fbbf24;">Apple (AAPL)</a> — 2 years of 10-K, 10-Q, 8-K</li>
                         <li>Semantic search + metadata filters</li>
                         <li>x402 micropayments on Base L2</li>
                         <li>MCP endpoint for agent discovery</li>
+                        <li><a href="{base_url}/data" style="color: #fbbf24;">Data catalog</a> — see exactly what's indexed</li>
                         <li>Feedback-driven iteration</li>
                     </ul>
-                    <p style="color: #d4a44a; font-size: 0.85rem; margin-bottom: 0;">We're working directly with early agent builders. <a href="mailto:bilko@bilko.run" style="color: #fbbf24;">Tell us what you need.</a></p>
+                    <p style="color: #d4a44a; font-size: 0.85rem; margin-bottom: 0;">
+                        <a href="{base_url}/company/apple" style="color: #fbbf24; font-weight: 600;">See Apple's filing data live →</a>
+                        &nbsp;|&nbsp;
+                        <a href="mailto:bilko@bilko.run" style="color: #fbbf24;">Tell us what you need</a>
+                    </p>
                 </div>
 
                 <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; position: relative;">

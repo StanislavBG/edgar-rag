@@ -335,6 +335,154 @@ async def health() -> dict:
     }
 
 
+@app.get("/data")
+async def data_catalog(request: Request):
+    """Show exactly what data is indexed — for agents and humans."""
+    from src.db import get_table
+
+    table = get_table()
+    catalog: dict = {"status": "empty", "companies": []}
+
+    if table is not None:
+        try:
+            df = table.to_pandas(columns=[
+                "company_name", "cik", "filing_type", "filing_date", "section",
+            ])
+            companies_data = []
+            for company_name in sorted(df["company_name"].unique()):
+                company_df = df[df["company_name"] == company_name]
+                cik = company_df["cik"].iloc[0]
+
+                filings = []
+                for _, row in (
+                    company_df.groupby(["filing_type", "filing_date"])
+                    .size()
+                    .reset_index(name="chunks")
+                    .iterrows()
+                ):
+                    filings.append({
+                        "type": row["filing_type"],
+                        "date": row["filing_date"],
+                        "chunks": int(row["chunks"]),
+                    })
+                filings.sort(key=lambda x: x["date"], reverse=True)
+
+                sections = sorted(company_df["section"].unique().tolist())
+                filing_types = sorted(company_df["filing_type"].unique().tolist())
+                date_range = {
+                    "earliest": company_df["filing_date"].min(),
+                    "latest": company_df["filing_date"].max(),
+                }
+
+                companies_data.append({
+                    "name": company_name,
+                    "cik": cik,
+                    "total_chunks": len(company_df),
+                    "filing_types": filing_types,
+                    "date_range": date_range,
+                    "sections": sections,
+                    "filings": filings,
+                })
+
+            catalog = {
+                "status": "available",
+                "total_chunks": len(df),
+                "total_companies": len(companies_data),
+                "companies": companies_data,
+            }
+        except Exception:
+            logger.debug("Failed to build data catalog")
+
+    accept = request.headers.get("accept", "")
+    if "text/html" in accept:
+        return HTMLResponse(content=_render_data_page(request, catalog))
+    return catalog
+
+
+def _render_data_page(request: Request, catalog: dict) -> str:
+    base = _base_url(request)
+    total = catalog.get("total_chunks", 0)
+    company_count = catalog.get("total_companies", 0)
+
+    companies_html = ""
+    for c in catalog.get("companies", []):
+        filings_rows = ""
+        for f in c["filings"]:
+            filings_rows += f'<tr><td>{f["type"]}</td><td>{f["date"]}</td><td>{f["chunks"]} passages</td></tr>'
+
+        sections_badges = " ".join(
+            f'<span class="badge">{s}</span>' for s in c.get("sections", [])
+        )
+
+        companies_html += f"""
+        <div class="company-card">
+            <h3>{c['name']} <span style="color: var(--muted); font-weight: 400;">({c['cik']})</span></h3>
+            <p>{c['total_chunks']} passages | {len(c['filings'])} filings | {c['date_range']['earliest']} to {c['date_range']['latest']}</p>
+            <p style="font-size: 0.85rem; color: var(--muted);">Filing types: {', '.join(c['filing_types'])}</p>
+            <div style="margin: 0.5rem 0;">{sections_badges}</div>
+            <details>
+                <summary style="cursor: pointer; color: var(--accent); font-size: 0.85rem;">View all filings</summary>
+                <table style="margin-top: 0.5rem;">
+                    <tr><th>Type</th><th>Filed</th><th>Data</th></tr>
+                    {filings_rows}
+                </table>
+            </details>
+        </div>"""
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Catalog — EDGAR RAG</title>
+    <meta name="description" content="Complete catalog of SEC filings indexed by EDGAR RAG. {company_count} companies, {total} passages from 10-K, 10-Q, and 8-K filings.">
+    <style>
+        :root {{ --bg: #0a0a0a; --surface: #141414; --border: #262626; --text: #e5e5e5; --muted: #a3a3a3; --accent: #3b82f6; --green: #22c55e; }}
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.7; }}
+        .container {{ max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem; }}
+        h1 {{ font-size: 2rem; font-weight: 700; margin-bottom: 0.5rem; }}
+        h2 {{ font-size: 1.3rem; font-weight: 600; margin: 2rem 0 1rem; color: var(--accent); }}
+        h3 {{ font-size: 1.1rem; font-weight: 600; margin: 0 0 0.25rem; }}
+        p {{ margin-bottom: 0.5rem; color: var(--muted); }}
+        a {{ color: var(--accent); text-decoration: none; }}
+        .badge {{ display: inline-block; padding: 0.15rem 0.5rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; font-size: 0.7rem; margin: 0.1rem; color: var(--muted); }}
+        .stat-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.75rem; margin: 1.5rem 0; }}
+        .stat {{ background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; }}
+        .stat-value {{ font-size: 1.5rem; font-weight: 700; }}
+        .stat-label {{ font-size: 0.8rem; color: var(--muted); }}
+        .company-card {{ background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; margin: 1rem 0; }}
+        table {{ width: 100%; border-collapse: collapse; font-size: 0.85rem; }}
+        th, td {{ text-align: left; padding: 0.5rem; border-bottom: 1px solid var(--border); }}
+        th {{ color: var(--muted); font-weight: 500; }}
+        details {{ margin-top: 0.5rem; }}
+        .nav {{ margin-bottom: 1.5rem; font-size: 0.85rem; }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="nav"><a href="{base}/">EDGAR RAG</a> / <a href="{base}/data">Data Catalog</a></div>
+        <h1>Data Catalog</h1>
+        <p style="color: var(--text);">Complete inventory of what's indexed and searchable. Every filing listed below is available via the <a href="{base}/api">/v1/query API</a> and <a href="{base}/api">MCP endpoint</a>.</p>
+
+        <div class="stat-grid">
+            <div class="stat"><div class="stat-value">{total:,}</div><div class="stat-label">Total passages</div></div>
+            <div class="stat"><div class="stat-value">{company_count}</div><div class="stat-label">Companies</div></div>
+            <div class="stat"><div class="stat-value">$0.01</div><div class="stat-label">Per query</div></div>
+        </div>
+
+        <h2>Indexed Companies</h2>
+        {companies_html}
+
+        <div style="margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--border); font-size: 0.85rem; color: var(--muted);">
+            <p>Data sourced from <a href="https://www.sec.gov/edgar/searchedgar/companysearch">SEC EDGAR</a> (public domain). Updated monthly.</p>
+            <p><a href="{base}/">Back to EDGAR RAG</a> | <a href="{base}/api">API (JSON)</a> | <a href="mailto:bilko@bilko.run">Request a company</a></p>
+        </div>
+    </div>
+</body>
+</html>"""
+
+
 @app.post("/upload-vectors")
 async def upload_vectors(
     file: UploadFile,
