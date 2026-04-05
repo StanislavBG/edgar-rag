@@ -9,3 +9,4 @@ dist/
 .env
 
 models/
+uv.lock
