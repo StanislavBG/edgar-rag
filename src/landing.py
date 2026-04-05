@@ -201,6 +201,13 @@ def render_landing(
                 <span class="badge">MCP Compatible</span>
                 <span class="badge">SEC EDGAR</span>
             </div>
+            <nav style="margin-top: 1rem; font-size: 0.9rem;">
+                <a href="#examples" style="color: var(--accent); margin-right: 1rem;">Live Examples</a>
+                <a href="#coverage" style="color: var(--accent); margin-right: 1rem;">Coverage</a>
+                <a href="{base_url}/companies" style="color: var(--accent); margin-right: 1rem;">Companies</a>
+                <a href="{base_url}/data" style="color: var(--accent); margin-right: 1rem;">Data Catalog</a>
+                <a href="{base_url}/api" style="color: var(--accent);">API (JSON)</a>
+            </nav>
         </header>
 
         <div class="stat-grid">
@@ -377,29 +384,122 @@ for result in response.json()["results"]:
             <p>Register the <code>/mcp</code> endpoint in any MCP-compatible agent framework (Claude, ChatGPT, custom agents). The agent calls <code>tools/list</code> for free, sees <code>search_filings</code>, and knows exactly how to use it. Discovery is free — you only pay when the agent actually searches.</p>
         </section>
 
-        <section class="section">
-            <h2>Real Examples from Apple's SEC Filings</h2>
-            <p>Here's what actual queries return from Apple's last 2 years of 10-K, 10-Q, and 8-K filings:</p>
+        <section class="section" id="examples">
+            <h2>Live Examples — Real Queries, Real Data</h2>
+            <p>Every example below is a live query you can run right now. Results are actual passages from SEC filings, not marketing copy.</p>
 
             <div class="endpoint">
-                <h3>"What was Apple's total revenue?"</h3>
-                <p style="color: var(--muted);">Returns the revenue table from Apple's latest 10-Q with breakdowns by product category — iPhone, Mac, iPad, Wearables, Services — with quarter-over-quarter and year-over-year comparisons.</p>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                    <h3 style="margin: 0;">Revenue breakdown by product</h3>
+                    <span style="font-size: 0.7rem; color: var(--accent); background: var(--surface); padding: 0.2rem 0.5rem; border-radius: 4px;">FINANCIAL DATA</span>
+                </div>
+                <p style="color: var(--muted); font-size: 0.85rem; margin-bottom: 0.5rem;"><code>"Apple iPhone Mac iPad Services revenue breakdown"</code></p>
+                <div style="background: #1a1a2e; border-left: 3px solid var(--accent); padding: 0.75rem 1rem; border-radius: 0 6px 6px 0; font-size: 0.85rem;">
+                    <div style="color: var(--accent); font-family: monospace; font-size: 0.75rem; margin-bottom: 0.25rem;">Apple Inc. | 10-K | 2025-10-31</div>
+                    "2024 2023 iPhone $ 209,586 $ 201,183 $ 200,583 Mac 33,708 29,984 29,357 iPad 28,023 26,694 28,300 Wearables, Home and Accessories 35,686 37,005 39,845 Services 109,158 96,169..."
+                </div>
             </div>
 
             <div class="endpoint">
-                <h3>"iPhone sales by region"</h3>
-                <p style="color: var(--muted);">Returns geographic segment data — Americas, Europe, Greater China, Japan, Rest of Asia Pacific — with net sales and operating income per region.</p>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                    <h3 style="margin: 0;">Industry trends and market dynamics</h3>
+                    <span style="font-size: 0.7rem; color: var(--accent); background: var(--surface); padding: 0.2rem 0.5rem; border-radius: 4px;">MARKET INTEL</span>
+                </div>
+                <p style="color: var(--muted); font-size: 0.85rem; margin-bottom: 0.5rem;"><code>"AI chip demand data center growth"</code></p>
+                <div style="background: #1a1a2e; border-left: 3px solid var(--accent); padding: 0.75rem 1rem; border-radius: 0 6px 6px 0; font-size: 0.85rem;">
+                    <div style="color: var(--accent); font-family: monospace; font-size: 0.75rem; margin-bottom: 0.25rem;">NVIDIA CORP | 10-Q | 2024-05-29</div>
+                    "Center revenue was up 427% from a year ago and up 23% sequentially. Data Center compute revenue was $19.4 billion, up 478% from a year ago and up 29% sequentially..."
+                </div>
             </div>
 
             <div class="endpoint">
-                <h3>"Apple risk factors and legal proceedings"</h3>
-                <p style="color: var(--muted);">Returns Item 1A Risk Factors and legal proceeding disclosures, including the Epic Games case, EU Digital Markets Act compliance, and tariff impacts.</p>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                    <h3 style="margin: 0;">Risk and regulatory exposure</h3>
+                    <span style="font-size: 0.7rem; color: var(--accent); background: var(--surface); padding: 0.2rem 0.5rem; border-radius: 4px;">RISK ANALYSIS</span>
+                </div>
+                <p style="color: var(--muted); font-size: 0.85rem; margin-bottom: 0.5rem;"><code>"Tesla autonomous driving regulatory risks"</code></p>
+                <div style="background: #1a1a2e; border-left: 3px solid var(--accent); padding: 0.75rem 1rem; border-radius: 0 6px 6px 0; font-size: 0.85rem;">
+                    <div style="color: var(--accent); font-family: monospace; font-size: 0.75rem; margin-bottom: 0.25rem;">Tesla, Inc. | 10-K | 2026-01-29</div>
+                    "This process may include official review and certification of our vehicles by foreign regulatory agencies prior to market entry, as well as compliance with foreign autonomous driving requirements..."
+                </div>
             </div>
 
             <div class="endpoint">
-                <h3>"Gross margin trends"</h3>
-                <p style="color: var(--muted);">Returns Products and Services gross margin percentages with management's explanation of what drove changes — product mix, tariff impacts, and cost improvements.</p>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                    <h3 style="margin: 0;">Capital returns to shareholders</h3>
+                    <span style="font-size: 0.7rem; color: var(--accent); background: var(--surface); padding: 0.2rem 0.5rem; border-radius: 4px;">CORPORATE EVENT</span>
+                </div>
+                <p style="color: var(--muted); font-size: 0.85rem; margin-bottom: 0.5rem;"><code>"share buyback dividend announcement"</code></p>
+                <div style="background: #1a1a2e; border-left: 3px solid var(--accent); padding: 0.75rem 1rem; border-radius: 0 6px 6px 0; font-size: 0.85rem;">
+                    <div style="color: var(--accent); font-family: monospace; font-size: 0.75rem; margin-bottom: 0.25rem;">NVIDIA CORP | 10-Q | 2024-05-29</div>
+                    "the dividend program and the declaration of dividends thereunder are in the best interests of our shareholders. On May 22, 2024, we announced an increase in our quarterly cash dividend..."
+                </div>
             </div>
+
+            <div class="endpoint">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                    <h3 style="margin: 0;">Cash flow and financial health</h3>
+                    <span style="font-size: 0.7rem; color: var(--accent); background: var(--surface); padding: 0.2rem 0.5rem; border-radius: 4px;">FUNDAMENTALS</span>
+                </div>
+                <p style="color: var(--muted); font-size: 0.85rem; margin-bottom: 0.5rem;"><code>"cash flow operating activities"</code></p>
+                <div style="background: #1a1a2e; border-left: 3px solid var(--accent); padding: 0.75rem 1rem; border-radius: 0 6px 6px 0; font-size: 0.85rem;">
+                    <div style="color: var(--accent); font-family: monospace; font-size: 0.75rem; margin-bottom: 0.25rem;">VISA INC. | 10-Q | 2025-04-30</div>
+                    "table summarizes our cash flow activity for the periods presented: Six Months Ended March 31, 2025 2024 (in millions) Total cash provided by (used in): Operating activities $ 10,09..."
+                </div>
+            </div>
+
+            <div class="endpoint">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                    <h3 style="margin: 0;">Segment performance</h3>
+                    <span style="font-size: 0.7rem; color: var(--accent); background: var(--surface); padding: 0.2rem 0.5rem; border-radius: 4px;">BUSINESS SEGMENTS</span>
+                </div>
+                <p style="color: var(--muted); font-size: 0.85rem; margin-bottom: 0.5rem;"><code>"Microsoft Azure cloud growth rate"</code></p>
+                <div style="background: #1a1a2e; border-left: 3px solid var(--accent); padding: 0.75rem 1rem; border-radius: 0 6px 6px 0; font-size: 0.85rem;">
+                    <div style="color: var(--accent); font-family: monospace; font-size: 0.75rem; margin-bottom: 0.25rem;">MICROSOFT CORP | 10-Q | 2024-04-25</div>
+                    "Nine Months Ended March 31, 2024 Compared with Nine Months Ended March 31, 2023 Revenue increased $24.7 billion or 16% driven by growth across each of our segments..."
+                </div>
+            </div>
+        </section>
+
+        <section class="section" id="coverage">
+            <h2>What's Indexed — Coverage at a Glance</h2>
+            <p>Here's exactly what you can query today and what's planned. No vaporware.</p>
+
+            <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; margin: 1rem 0;">
+                <h3 style="margin-top: 0; color: var(--green);">✓ Indexed Now ({filing_count:,} passages)</h3>
+                <table style="width: 100%; margin: 0.5rem 0;">
+                    <tr><th>Companies</th><td><strong>{company_count}</strong> (Apple, Microsoft, Google, Amazon, NVIDIA, Tesla, Meta, JPMorgan, Goldman, Visa, J&amp;J)</td></tr>
+                    <tr><th>Time span</th><td><strong>2 years</strong> (2024-2026)</td></tr>
+                    <tr><th>Filing types</th><td><strong>10-K</strong> (annual) · <strong>10-Q</strong> (quarterly) · <strong>8-K</strong> (events)</td></tr>
+                    <tr><th>Total filings</th><td><strong>~940 documents</strong></td></tr>
+                    <tr><th>Refresh</th><td>Monthly batch ingestion</td></tr>
+                </table>
+                <p style="margin: 1rem 0 0; font-size: 0.9rem;"><a href="{base_url}/data" style="color: var(--green); font-weight: 600;">→ View detailed coverage catalog</a></p>
+            </div>
+
+            <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; margin: 1rem 0; opacity: 0.85;">
+                <h3 style="margin-top: 0; color: var(--accent);">⏳ Beta (Next)</h3>
+                <table style="width: 100%; margin: 0.5rem 0;">
+                    <tr><th>Companies</th><td>S&amp;P 500 (~500 companies)</td></tr>
+                    <tr><th>Time span</th><td>10 years</td></tr>
+                    <tr><th>Filing types</th><td>+ Proxy statements (DEF 14A), + Insider filings (Form 4)</td></tr>
+                    <tr><th>Section filtering</th><td>Query specific Items (1A Risk Factors, 7 MD&amp;A, etc.)</td></tr>
+                </table>
+            </div>
+
+            <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; margin: 1rem 0; opacity: 0.7;">
+                <h3 style="margin-top: 0; color: var(--muted);">○ General Availability (Later)</h3>
+                <table style="width: 100%; margin: 0.5rem 0;">
+                    <tr><th>Companies</th><td>All ~8,000 public companies on SEC EDGAR</td></tr>
+                    <tr><th>Time span</th><td>20+ years</td></tr>
+                    <tr><th>Data sources</th><td>+ arXiv research papers, + USPTO patents</td></tr>
+                    <tr><th>Features</th><td>Hybrid retrieval, re-ranking, Google A2A protocol</td></tr>
+                </table>
+            </div>
+
+            <p style="text-align: center; margin-top: 1rem;">
+                <a href="mailto:bilko@bilko.run" style="color: var(--green); font-weight: 600;">Want a specific company added? Email us.</a>
+            </p>
         </section>
 
         <section class="section">
