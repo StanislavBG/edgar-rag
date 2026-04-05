@@ -41,21 +41,17 @@ def _load_model():
     import onnxruntime as ort
     from tokenizers import Tokenizer
 
-    if LOCAL_MODEL_ONNX.exists() and LOCAL_MODEL_TOKENIZER.exists():
-        logger.info(
-            "Loading embedding model via ONNX runtime (loading from local path %s)",
-            LOCAL_MODEL_DIR,
+    if not (LOCAL_MODEL_ONNX.exists() and LOCAL_MODEL_TOKENIZER.exists()):
+        msg = (
+            f"Local ONNX model not found at {LOCAL_MODEL_DIR}. "
+            "Run install.sh to download the model bundle from GitHub Releases, "
+            "or install huggingface-hub and set up the HF Hub fallback."
         )
-        model_path = str(LOCAL_MODEL_ONNX)
-        tokenizer = Tokenizer.from_file(str(LOCAL_MODEL_TOKENIZER))
-    else:
-        logger.info("Loading embedding model via ONNX runtime (downloading from HuggingFace Hub)")
-        from huggingface_hub import hf_hub_download
+        raise RuntimeError(msg)
 
-        model_path = hf_hub_download(
-            repo_id=MODEL_NAME, filename="onnx/model.onnx", revision="main"
-        )
-        tokenizer = Tokenizer.from_pretrained(MODEL_NAME)
+    logger.info("Loading embedding model via ONNX runtime from %s", LOCAL_MODEL_DIR)
+    model_path = str(LOCAL_MODEL_ONNX)
+    tokenizer = Tokenizer.from_file(str(LOCAL_MODEL_TOKENIZER))
 
     tokenizer.enable_padding()
     tokenizer.enable_truncation(max_length=512)
