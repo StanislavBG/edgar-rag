@@ -48,10 +48,11 @@ def get_table() -> lancedb.table.Table | None:
 
 
 def reload_db() -> None:
-    global _db, _table, _companies_cache
+    global _db, _table, _companies_cache, _stats_cache
     _db = None
     _table = None
     _companies_cache = None
+    _stats_cache = None
     get_db()
 
 
@@ -66,6 +67,12 @@ def get_filing_count() -> int:
         return 0
 
 
+def _full_table_df(table):
+    """LanceTable.to_pandas() caps at 10 rows — use search().limit() to get all."""
+    count = table.count_rows()
+    return table.search().limit(max(count, 1)).to_pandas()
+
+
 def get_companies() -> list[str]:
     global _companies_cache
     if _companies_cache is not None:
@@ -74,12 +81,50 @@ def get_companies() -> list[str]:
     if table is None:
         return []
     try:
-        df = table.to_pandas(columns=["company_name"])
+        df = _full_table_df(table)
         _companies_cache = sorted(df["company_name"].unique().tolist())
         return _companies_cache
     except Exception:
-        logger.debug("Failed to get companies")
+        logger.exception("Failed to get companies")
         return []
+
+
+_stats_cache: dict | None = None
+
+
+def get_data_stats() -> dict:
+    """Compute catalog stats once, cache them. Source of truth for all pages."""
+    global _stats_cache
+    if _stats_cache is not None:
+        return _stats_cache
+    table = get_table()
+    if table is None:
+        return {"total_chunks": 0, "total_filings": 0, "companies": [], "date_range": "—"}
+    try:
+        df = _full_table_df(table)
+        # Note: source_url is the unique filing identifier — accession_number was
+        # mistakenly stored as CIK during ingestion
+        unique_filings = df.drop_duplicates(["source_url"])
+        companies = sorted(df["company_name"].unique().tolist())
+        dates = df["filing_date"].dropna()
+        earliest = dates.min() if len(dates) else ""
+        latest = dates.max() if len(dates) else ""
+        date_range = (
+            f"{earliest[:4]}-{latest[:4]}" if earliest and latest and earliest[:4] != latest[:4]
+            else earliest[:4] if earliest else "—"
+        )
+        _stats_cache = {
+            "total_chunks": len(df),
+            "total_filings": len(unique_filings),
+            "companies": companies,
+            "date_range": date_range,
+            "earliest": earliest,
+            "latest": latest,
+        }
+        return _stats_cache
+    except Exception:
+        logger.exception("Failed to compute stats")
+        return {"total_chunks": 0, "total_filings": 0, "companies": [], "date_range": "—"}
 
 
 def validate_vector(vector: list[float]) -> np.ndarray:

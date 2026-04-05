@@ -13,12 +13,15 @@ def render_landing(
     tool_schema: dict,
     is_admin: bool = False,
     price: str = "$0.00",
+    total_filings: int = 0,
+    date_range: str = "2024-2026",
 ) -> str:
     companies_html = ", ".join(companies) if companies else "Loading first batch..."
     company_count = len(companies) if companies else 0
     is_alpha_free = price in ("$0.00", "$0", "0", "$0.0")
     price_display = f"{price} per query" + (" (free during alpha)" if is_alpha_free else "")
     price_short = "Free" if is_alpha_free else price
+    filings_str = f"{total_filings:,}" if total_filings else "—"
     admin_link = (
         f'<a href="{base_url}/admin" style="color:#fbbf24;margin-left:0.5rem;">[admin]</a>'
         if is_admin
@@ -469,9 +472,9 @@ for result in response.json()["results"]:
                 <h3 style="margin-top: 0; color: var(--green);">✓ Indexed Now ({filing_count:,} passages)</h3>
                 <table style="width: 100%; margin: 0.5rem 0;">
                     <tr><th>Companies</th><td><strong>{company_count}</strong> (Apple, Microsoft, Google, Amazon, NVIDIA, Tesla, Meta, JPMorgan, Goldman, Visa, J&amp;J)</td></tr>
-                    <tr><th>Time span</th><td><strong>2 years</strong> (2024-2026)</td></tr>
+                    <tr><th>Time span</th><td><strong>{date_range}</strong></td></tr>
                     <tr><th>Filing types</th><td><strong>10-K</strong> (annual) · <strong>10-Q</strong> (quarterly) · <strong>8-K</strong> (events)</td></tr>
-                    <tr><th>Total filings</th><td><strong>~940 documents</strong></td></tr>
+                    <tr><th>Total filings</th><td><strong>{filings_str} documents</strong></td></tr>
                     <tr><th>Refresh</th><td>Monthly batch ingestion</td></tr>
                 </table>
                 <p style="margin: 1rem 0 0; font-size: 0.9rem;"><a href="{base_url}/data" style="color: var(--green); font-weight: 600;">→ View detailed coverage catalog</a></p>

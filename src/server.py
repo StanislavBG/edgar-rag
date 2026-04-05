@@ -22,7 +22,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from src.audit import AuditMiddleware
 from src.audit import router as admin_router
 from src.company import router as company_router
-from src.db import DATA_DIR, get_companies, get_filing_count, reload_db
+from src.db import DATA_DIR, get_companies, get_data_stats, get_filing_count, reload_db
 from src.errors import ErrorCode, make_error
 from src.mcp import TOOLS
 from src.mcp import router as mcp_router
@@ -411,15 +411,25 @@ async def root(request: Request):
     if "text/html" in accept:
         from src.landing import render_landing
 
-        filing_count = get_filing_count()
-        companies = get_companies()
+        stats = get_data_stats()
+        filing_count = stats.get("total_chunks", 0)
+        companies = stats.get("companies", [])
+        total_filings = stats.get("total_filings", 0)
+        date_range = stats.get("date_range", "—")
         base = _base_url(request)
         tool_schema = QueryRequest.model_json_schema()
         admin_key = request.headers.get("x-admin-key", "")
         expected = os.environ.get("UPLOAD_SECRET", "")
         is_admin = bool(admin_key and expected and admin_key == expected)
         html = render_landing(
-            base, filing_count, companies, tool_schema, is_admin=is_admin, price=QUERY_PRICE
+            base,
+            filing_count,
+            companies,
+            tool_schema,
+            is_admin=is_admin,
+            price=QUERY_PRICE,
+            total_filings=total_filings,
+            date_range=date_range,
         )
         return HTMLResponse(content=html)
     return _build_api_data(request)
@@ -443,22 +453,16 @@ async def health() -> dict:
 @app.get("/data")
 async def data_catalog(request: Request):
     """Show exactly what data is indexed — for agents and humans."""
-    from src.db import get_table
+    from src.db import _full_table_df, get_table
 
     table = get_table()
     catalog: dict = {"status": "empty", "companies": []}
 
     if table is not None:
         try:
-            df = table.to_pandas(
-                columns=[
-                    "company_name",
-                    "cik",
-                    "filing_type",
-                    "filing_date",
-                    "section",
-                ]
-            )
+            df = _full_table_df(table)[
+                ["company_name", "cik", "filing_type", "filing_date", "section"]
+            ]
             companies_data = []
             for company_name in sorted(df["company_name"].unique()):
                 company_df = df[df["company_name"] == company_name]
@@ -506,7 +510,7 @@ async def data_catalog(request: Request):
                 "companies": companies_data,
             }
         except Exception:
-            logger.debug("Failed to build data catalog")
+            logger.exception("Failed to build data catalog")
 
     accept = request.headers.get("accept", "")
     if "text/html" in accept:
@@ -518,6 +522,8 @@ def _render_data_page(request: Request, catalog: dict) -> str:
     base = _base_url(request)
     total = catalog.get("total_chunks", 0)
     company_count = catalog.get("total_companies", 0)
+    is_alpha_free = QUERY_PRICE in ("$0.00", "$0", "0", "$0.0")
+    price_short = "Free" if is_alpha_free else QUERY_PRICE
 
     companies_html = ""
     for c in catalog.get("companies", []):
@@ -583,7 +589,7 @@ def _render_data_page(request: Request, catalog: dict) -> str:
         <div class="stat-grid">
             <div class="stat"><div class="stat-value">{total:,}</div><div class="stat-label">Total passages</div></div>
             <div class="stat"><div class="stat-value">{company_count}</div><div class="stat-label">Companies</div></div>
-            <div class="stat"><div class="stat-value">$0.01</div><div class="stat-label">Per query</div></div>
+            <div class="stat"><div class="stat-value">{price_short}</div><div class="stat-label">Per query</div></div>
         </div>
 
         <h2>Indexed Companies</h2>

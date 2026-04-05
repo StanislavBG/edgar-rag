@@ -115,7 +115,9 @@ def _build_catalog() -> dict:
         return {"total_chunks": 0, "companies": []}
 
     try:
-        df = table.to_pandas(columns=["company_name", "cik", "filing_type", "filing_date"])
+        from src.db import _full_table_df
+
+        df = _full_table_df(table)[["company_name", "cik", "filing_type", "filing_date"]]
         companies = []
         for name in sorted(df["company_name"].unique()):
             cdf = df[df["company_name"] == name]
