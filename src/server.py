@@ -32,6 +32,9 @@ from src.query import router as query_router
 logger = logging.getLogger("edgar-rag")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
+# Query price — alpha is free ($0.00), set X402_PRICE env var to charge
+QUERY_PRICE = os.environ.get("X402_PRICE", "$0.00")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -80,7 +83,7 @@ def _setup_x402() -> None:
             "POST /v1/query": RouteConfig(
                 accepts=PaymentOption(
                     scheme="exact",
-                    price="$0.01",
+                    price=QUERY_PRICE,
                     network="eip155:8453",
                     pay_to=wallet,
                 ),
@@ -89,7 +92,7 @@ def _setup_x402() -> None:
         }
 
         app.add_middleware(PaymentMiddlewareASGI, routes=routes, server=server)
-        logger.info("x402 payment gating ENABLED on /v1/query ($0.01 USDC on Base)")
+        logger.info(f"x402 payment gating ENABLED on /v1/query ({QUERY_PRICE} USDC on Base)")
 
     except Exception:
         logger.exception("Failed to initialize x402 — payment gating DISABLED")
@@ -231,14 +234,14 @@ def _build_api_data(request: Request) -> dict:
     return {
         "service": "EDGAR RAG",
         "version": "0.1.0",
-        "tagline": "SEC filings for AI agents. $0.01 per query. No account needed.",
+        "tagline": f"SEC filings for AI agents. {QUERY_PRICE} per query (free during alpha). No account needed.",
         "description": (
             "Semantic search over SEC EDGAR filings (10-K, 10-Q, 8-K). "
             "Send a natural language query, get back relevant passages with "
             "company name, filing date, section label, and source URL. "
             "Pay per query via the x402 micropayment protocol — no API keys, "
-            "no subscriptions, no accounts. Your agent pays $0.01 in USDC "
-            "on Base L2 and gets instant results."
+            f"no subscriptions, no accounts. Your agent pays {QUERY_PRICE} in USDC "
+            "on Base L2 and gets instant results. (Free during alpha.)"
         ),
         "status": {
             "filings_indexed": filing_count,
@@ -250,14 +253,14 @@ def _build_api_data(request: Request) -> dict:
         "quick_start": {
             "step_1": f"Send a POST to {base}/v1/query with your search query",
             "step_2": "Receive HTTP 402 with payment details (price, wallet, network)",
-            "step_3": "Your x402 SDK signs a $0.01 USDC payment on Base L2",
+            "step_3": f"Your x402 SDK signs a {QUERY_PRICE} USDC payment on Base L2",
             "step_4": "Retry the same request with the payment proof header",
             "step_5": "Receive HTTP 200 with ranked filing passages and citations",
         },
         "endpoints": {
             "POST /v1/query": {
                 "description": "Search SEC filings by natural language query",
-                "cost": "$0.01 USDC per request (via x402)",
+                "cost": f"{QUERY_PRICE} USDC per request (via x402)",
                 "request_schema": tool_schema,
                 "response_fields": {
                     "results[]": {
@@ -310,7 +313,7 @@ def _build_api_data(request: Request) -> dict:
             "POST /mcp": {
                 "description": "MCP Streamable HTTP endpoint (JSON-RPC 2.0)",
                 "free_methods": ["initialize", "tools/list"],
-                "paid_methods": {"tools/call": "$0.01 USDC via x402"},
+                "paid_methods": {"tools/call": f"{QUERY_PRICE} USDC via x402"},
                 "tool_schemas": TOOLS,
             },
             "GET /health": {
@@ -325,10 +328,10 @@ def _build_api_data(request: Request) -> dict:
             "protocol": "x402 (HTTP 402 Payment Required)",
             "how_it_works": (
                 "Hit a paid endpoint without payment -> get 402 with price details -> "
-                "your x402 SDK pays $0.01 USDC on Base L2 -> retry with proof -> get results. "
+                f"your x402 SDK pays {QUERY_PRICE} USDC on Base L2 -> retry with proof -> get results. "
                 "~200ms overhead. No accounts needed."
             ),
-            "price": "$0.01 per query",
+            "price": f"{QUERY_PRICE} per query (free during alpha)",
             "asset": "USDC on Base L2 (chain ID 8453)",
             "sdk": {
                 "python": "pip install x402",
@@ -339,7 +342,7 @@ def _build_api_data(request: Request) -> dict:
         "why_use_this": {
             "for_agents": (
                 "Fresh SEC filing data without re-embedding terabytes yourself. "
-                "$0.01 per lookup vs ~$500/month to build your own pipeline."
+                f"{QUERY_PRICE} per lookup (free during alpha) vs ~$500/month to build your own pipeline."
             ),
             "for_developers": (
                 "Semantic search across 10-K, 10-Q, and 8-K filings "
@@ -415,7 +418,9 @@ async def root(request: Request):
         admin_key = request.headers.get("x-admin-key", "")
         expected = os.environ.get("UPLOAD_SECRET", "")
         is_admin = bool(admin_key and expected and admin_key == expected)
-        html = render_landing(base, filing_count, companies, tool_schema, is_admin=is_admin)
+        html = render_landing(
+            base, filing_count, companies, tool_schema, is_admin=is_admin, price=QUERY_PRICE
+        )
         return HTMLResponse(content=html)
     return _build_api_data(request)
 

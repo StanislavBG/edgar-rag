@@ -12,9 +12,13 @@ def render_landing(
     companies: list[str],
     tool_schema: dict,
     is_admin: bool = False,
+    price: str = "$0.00",
 ) -> str:
     companies_html = ", ".join(companies) if companies else "Loading first batch..."
     company_count = len(companies) if companies else 0
+    is_alpha_free = price in ("$0.00", "$0", "0", "$0.0")
+    price_display = f"{price} per query" + (" (free during alpha)" if is_alpha_free else "")
+    price_short = "Free" if is_alpha_free else price
     admin_link = (
         f'<a href="{base_url}/admin" style="color:#fbbf24;margin-left:0.5rem;">[admin]</a>'
         if is_admin
@@ -27,8 +31,8 @@ def render_landing(
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EDGAR RAG — SEC Filing Search API for AI Agents | $0.01/query</title>
-    <meta name="description" content="Semantic search API over SEC EDGAR filings (10-K, 10-Q, 8-K). AI agents pay $0.01 per query via x402 micropayments. No API keys, no accounts. Instant access to financial data from {company_count}+ public companies.">
+    <title>EDGAR RAG — SEC Filing Search API for AI Agents | {price_short}/query</title>
+    <meta name="description" content="Semantic search API over SEC EDGAR filings (10-K, 10-Q, 8-K). AI agents pay {price} per query via x402 micropayments (free during alpha). No API keys, no accounts. Instant access to financial data from {company_count}+ public companies.">
     <meta name="keywords" content="SEC EDGAR, API, RAG, AI agents, financial data, 10-K, 10-Q, 8-K, micropayments, x402, USDC, semantic search, SEC filings, stock research, financial analysis, machine learning, LLM tools, MCP server">
     <meta name="robots" content="index, follow">
     <meta name="author" content="BGLabs">
@@ -36,14 +40,14 @@ def render_landing(
 
     <!-- Open Graph -->
     <meta property="og:title" content="EDGAR RAG — SEC Filing Search for AI Agents">
-    <meta property="og:description" content="Semantic search over SEC EDGAR filings. AI agents pay $0.01/query via x402. No accounts needed.">
+    <meta property="og:description" content="Semantic search over SEC EDGAR filings. {price_short} per query via x402. No accounts needed.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="{base_url}/">
 
     <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="EDGAR RAG — SEC Filing Search for AI Agents">
-    <meta name="twitter:description" content="$0.01/query semantic search over 10-K, 10-Q, 8-K filings. Pay with USDC via x402.">
+    <meta name="twitter:description" content="{price_short}/query semantic search over 10-K, 10-Q, 8-K filings. Pay with USDC via x402.">
 
     <!-- Schema.org structured data -->
     <script type="application/ld+json">
@@ -189,7 +193,7 @@ def render_landing(
 
         <header>
             <h1>EDGAR RAG{admin_link}</h1>
-            <p class="tagline">SEC filings for AI agents. $0.01 per query. No account needed.</p>
+            <p class="tagline">SEC filings for AI agents. {price_display}. No account needed.</p>
             <div>
                 <span class="badge" style="border-color: #f59e0b; color: #f59e0b;">Alpha</span>
                 <span class="badge live">Live</span>
@@ -209,7 +213,7 @@ def render_landing(
                 <div class="stat-label">Companies available</div>
             </div>
             <div class="stat">
-                <div class="stat-value">$0.01</div>
+                <div class="stat-value">{price_short}</div>
                 <div class="stat-label">Per query (USDC)</div>
             </div>
             <div class="stat">
@@ -285,7 +289,7 @@ def render_landing(
             </p>
             <p>
                 Built for AI agents. Payments via the <a href="https://docs.x402.org/">x402 protocol</a> — your agent
-                pays $0.01 in USDC on Base L2 per query. No API keys, no subscriptions, no accounts. Just HTTP.
+                pays {price} in USDC on Base L2 per query (free during alpha). No API keys, no subscriptions, no accounts. Just HTTP.
             </p>
         </section>
 
@@ -296,13 +300,13 @@ def render_landing(
                 chunking documents intelligently, embedding with a vector model, and maintaining a vector database.
                 That costs ~$500/month in compute and takes weeks of engineering.
             </p>
-            <p>We did it for you. Pay $0.01 per lookup instead.</p>
+            <p>We did it for you. Pay {price} per lookup instead (free during alpha).</p>
 
             <table>
                 <tr><th>Approach</th><th>Cost</th><th>Setup Time</th></tr>
                 <tr><td>Build your own EDGAR pipeline</td><td>~$500/month</td><td>Weeks</td></tr>
                 <tr><td>Valyu financial data API</td><td>$8 per 1,000 tokens</td><td>Hours</td></tr>
-                <tr><td><strong>EDGAR RAG</strong></td><td><strong>$0.01 per query</strong></td><td><strong>0 minutes</strong></td></tr>
+                <tr><td><strong>EDGAR RAG</strong></td><td><strong>{price_display}</strong></td><td><strong>0 minutes</strong></td></tr>
             </table>
         </section>
 
@@ -357,7 +361,7 @@ for result in response.json()["results"]:
             <p>If your agent processes 1,000 financial queries per day:</p>
             <table>
                 <tr><th>Approach</th><th>Daily Cost</th><th>Monthly Cost</th></tr>
-                <tr><td>EDGAR RAG ($0.01/query)</td><td>$10</td><td><strong>$300</strong></td></tr>
+                <tr><td>EDGAR RAG ({price_short}/query)</td><td>$10</td><td><strong>$300</strong></td></tr>
                 <tr><td>GPT-4 reading raw filings (~50K tokens each)</td><td>$500+</td><td><strong>$15,000+</strong></td></tr>
                 <tr><td>Self-hosted pipeline (EC2 + vector DB)</td><td>$17</td><td><strong>$500+ setup</strong></td></tr>
             </table>
@@ -410,7 +414,7 @@ for result in response.json()["results"]:
             </div>
             <div class="step">
                 <div class="step-num">3</div>
-                <div><strong>Pay $0.01</strong> — Your x402 SDK signs a USDC payment on Base L2</div>
+                <div><strong>Pay {price}</strong> — Your x402 SDK signs a USDC payment on Base L2 (free during alpha)</div>
             </div>
             <div class="step">
                 <div class="step-num">4</div>
@@ -426,7 +430,7 @@ for result in response.json()["results"]:
             <h2>API Reference</h2>
 
             <div class="endpoint">
-                <p><span class="method">POST</span> <span class="path">/v1/query</span> <span class="cost">— $0.01 USDC via x402</span></p>
+                <p><span class="method">POST</span> <span class="path">/v1/query</span> <span class="cost">— {price} USDC via x402</span></p>
                 <p>Search SEC filings by natural language query. Returns ranked text passages with metadata.</p>
 
                 <h3>Request Body</h3>
@@ -470,7 +474,7 @@ for result in response.json()["results"]:
             </div>
 
             <div class="endpoint">
-                <p><span class="method">POST</span> <span class="path">/v1/query/stream</span> <span class="cost">— $0.01 USDC via x402</span></p>
+                <p><span class="method">POST</span> <span class="path">/v1/query/stream</span> <span class="cost">— {price} USDC via x402</span></p>
                 <p>Same as <code>/v1/query</code>, but streams results as Server-Sent Events (SSE) so agents can process
                 passages as they arrive. Each event is a <code>data:</code> line; the first event has <code>type=metadata</code>,
                 each subsequent event has <code>type=result</code>, and the stream terminates with <code>data: [DONE]</code>.</p>
@@ -506,7 +510,7 @@ data: [DONE]</code></pre>
                     <li><code>tools/list</code> — returns available tool schemas</li>
                 </ul>
 
-                <h3>Paid Methods ($0.01 via x402)</h3>
+                <h3>Paid Methods ({price} via x402)</h3>
                 <ul style="color: var(--muted); margin: 0.5rem 0 0.5rem 1.5rem;">
                     <li><code>tools/call search_filings</code> — execute a filing search</li>
                 </ul>
@@ -540,7 +544,7 @@ data: [DONE]</code></pre>
 
             <table>
                 <tr><th>Detail</th><th>Value</th></tr>
-                <tr><td>Price per query</td><td>$0.01 USD</td></tr>
+                <tr><td>Price per query</td><td>{price_display}</td></tr>
                 <tr><td>Payment asset</td><td>USDC (stablecoin, 1 USDC = $1.00)</td></tr>
                 <tr><td>Network</td><td>Base L2 (Coinbase Ethereum L2, chain ID 8453)</td></tr>
                 <tr><td>Transaction cost</td><td>~$0.0001 per payment</td></tr>
@@ -635,7 +639,7 @@ data: [DONE]</code></pre>
                 <li><strong>Priority company indexing</strong> — tell us which companies your agent needs, we'll add them first</li>
                 <li><strong>Direct support</strong> — we'll help you integrate and debug your agent's queries</li>
                 <li><strong>Influence the roadmap</strong> — your use case drives what we build next</li>
-                <li><strong>Locked-in $0.01 pricing</strong> — alpha pricing stays when we scale</li>
+                <li><strong>Free alpha pricing</strong> — help us tune the service while you test for free</li>
             </ul>
             <p style="margin-bottom: 0;"><a href="mailto:bilko@bilko.run" style="color: var(--green); font-weight: 600;">bilko@bilko.run</a> — tell us what you're building</p>
         </section>

@@ -6,6 +6,7 @@ Validates the pipeline end-to-end: ingestion → storage → search → display.
 from __future__ import annotations
 
 import logging
+import os
 import re
 
 from fastapi import APIRouter, Request
@@ -231,6 +232,9 @@ def render_company_page(request: Request, slug: str) -> str | None:
     ticker = company["ticker"]
     base = str(request.base_url).rstrip("/")
     total_chunks = get_filing_count()
+    price = os.environ.get("X402_PRICE", "$0.00")
+    is_alpha_free = price in ("$0.00", "$0", "0", "$0.0")
+    price_short = "Free" if is_alpha_free else price
 
     # Build table of contents
     toc_items = "".join(
@@ -337,7 +341,7 @@ def render_company_page(request: Request, slug: str) -> str | None:
                 <div class="stat-label">Filings (10-K, 10-Q, 8-K)</div>
             </div>
             <div class="stat">
-                <div class="stat-value">$0.01</div>
+                <div class="stat-value">{price_short}</div>
                 <div class="stat-label">Per API query</div>
             </div>
         </div>

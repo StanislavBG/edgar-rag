@@ -1,13 +1,14 @@
 """MCP Streamable HTTP endpoint.
 
 Handles MCP JSON-RPC 2.0 over HTTP.
-Free: initialize, tools/list, list_companies, get_data_catalog
-Paid: tools/call search_filings ($0.01 via x402)
+Free: initialize, tools/list, list_companies, get_data_catalog, get_filing
+Paid: tools/call search_filings (price via X402_PRICE env var)
 """
 
 from __future__ import annotations
 
 import logging
+import os
 import re
 
 from fastapi import APIRouter, Request
@@ -26,13 +27,16 @@ logger = logging.getLogger("edgar-rag")
 
 router = APIRouter()
 
+QUERY_PRICE = os.environ.get("X402_PRICE", "$0.00")
+
 SERVER_INFO = {
     "name": "edgar-rag",
     "version": "0.1.0",
     "description": (
         "Semantic search over SEC EDGAR filings (10-K, 10-Q, 8-K). "
         "Query by natural language, get ranked passages with citations. "
-        "$0.01/query via x402. Free tools: list_companies, get_data_catalog."
+        f"{QUERY_PRICE}/query via x402 (free during alpha). "
+        "Free tools: list_companies, get_data_catalog, get_filing."
     ),
     "capabilities": {"tools": {}},
 }
@@ -46,7 +50,7 @@ TOOLS = [
         "description": (
             "Search SEC EDGAR filings by semantic query. Returns relevant text "
             "passages with company, filing type, date, section, and source URL. "
-            "Costs $0.01 USDC via x402."
+            f"Costs {QUERY_PRICE} USDC via x402 (free during alpha)."
         ),
         "inputSchema": {
             "type": "object",
