@@ -41,4 +41,33 @@ else
     fi
 fi
 
+# Download vector bundle from the private GitHub Release (baked into the build
+# image so it survives Cloud Run cold starts/redeploys, unlike /upload-vectors
+# to the ephemeral runtime disk). Requires GITHUB_TOKEN in Replit Secrets.
+REPO="StanislavBG/edgar-rag"
+DATA_TAG="v0.1.0-data"
+ASSET_NAME="edgar-vectors.tar.gz"
+
+if [ -d "data/vectors" ] && [ -n "$(ls -A data/vectors 2>/dev/null)" ]; then
+    echo "Vectors already present — skipping download"
+elif [ -z "$GITHUB_TOKEN" ]; then
+    echo "WARNING: GITHUB_TOKEN not set — skipping vector download. Server will start with 0 filings."
+else
+    echo "Downloading vector bundle from GitHub Release $DATA_TAG..."
+    ASSET_URL=$(curl -fsSL -H "Authorization: Bearer $GITHUB_TOKEN" \
+        "https://api.github.com/repos/$REPO/releases/tags/$DATA_TAG" 2>/dev/null \
+        | python3 -c "import sys,json; d=json.load(sys.stdin); print(next((a['url'] for a in d.get('assets',[]) if a['name']=='$ASSET_NAME'),''))" 2>/dev/null)
+    if [ -n "$ASSET_URL" ]; then
+        mkdir -p data
+        curl -fsSL -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/octet-stream" \
+            -o data/vectors.tar.gz "$ASSET_URL" 2>/dev/null || echo "vector download failed"
+        if [ -f "data/vectors.tar.gz" ]; then
+            tar xzf data/vectors.tar.gz -C data && rm -f data/vectors.tar.gz
+            echo "Vectors extracted to data/vectors"
+        fi
+    else
+        echo "WARNING: could not resolve $ASSET_NAME in release $DATA_TAG"
+    fi
+fi
+
 exit 0

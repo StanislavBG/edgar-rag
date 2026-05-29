@@ -16,6 +16,7 @@ MODEL_NAME = "BAAI/bge-small-en-v1.5"
 _db: lancedb.DBConnection | None = None
 _table: lancedb.table.Table | None = None
 _companies_cache: list[str] | None = None
+_full_df_cache = None  # materialized full table; only changes on reload_db()
 
 
 def get_db() -> lancedb.DBConnection | None:
@@ -48,11 +49,12 @@ def get_table() -> lancedb.table.Table | None:
 
 
 def reload_db() -> None:
-    global _db, _table, _companies_cache, _stats_cache
+    global _db, _table, _companies_cache, _stats_cache, _full_df_cache
     _db = None
     _table = None
     _companies_cache = None
     _stats_cache = None
+    _full_df_cache = None
     get_db()
 
 
@@ -68,9 +70,18 @@ def get_filing_count() -> int:
 
 
 def _full_table_df(table):
-    """LanceTable.to_pandas() caps at 10 rows — use search().limit() to get all."""
+    """Materialize the full table once and cache it — the data is read-only
+    between uploads, so every catalog/stats/company scan can share one copy.
+    Invalidated by reload_db(). O(n) on first call, O(1) thereafter.
+
+    (LanceTable.to_pandas() caps at 10 rows — use search().limit() to get all.)
+    """
+    global _full_df_cache
+    if _full_df_cache is not None:
+        return _full_df_cache
     count = table.count_rows()
-    return table.search().limit(max(count, 1)).to_pandas()
+    _full_df_cache = table.search().limit(max(count, 1)).to_pandas()
+    return _full_df_cache
 
 
 def get_companies() -> list[str]:
@@ -102,8 +113,7 @@ def get_data_stats() -> dict:
         return {"total_chunks": 0, "total_filings": 0, "companies": [], "date_range": "—"}
     try:
         df = _full_table_df(table)
-        # Note: source_url is the unique filing identifier — accession_number was
-        # mistakenly stored as CIK during ingestion
+        # source_url is the canonical unique filing identifier.
         unique_filings = df.drop_duplicates(["source_url"])
         companies = sorted(df["company_name"].unique().tolist())
         dates = df["filing_date"].dropna()

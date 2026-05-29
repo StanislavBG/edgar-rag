@@ -331,7 +331,11 @@ def chunk_text(
 def create_chunks(filing: dict, text: str) -> list[dict]:
     """Create chunks from a single filing."""
     sections = split_by_sections(text, filing["filing_type"])
-    accession = filing.get("accession_number", filing["index_url"].split("/")[-2])
+    # Accession is the filename in the index URL (…/<cik>/<accession>.txt), NOT the
+    # parent dir (which is the CIK). [-2] was the long-standing data bug.
+    accession = filing.get(
+        "accession_number", filing["index_url"].split("/")[-1].replace(".txt", "")
+    )
     source_url = filing["index_url"]
 
     all_chunks = []

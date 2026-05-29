@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hmac
 import json
 import logging
 import os
@@ -35,6 +36,19 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 # Query price — alpha is free ($0.00), set X402_PRICE env var to charge
 QUERY_PRICE = os.environ.get("X402_PRICE", "$0.00")
 
+_FREE_PRICES = {"$0.00", "$0", "0", "$0.0", ""}
+
+
+def _price_is_free(price: str) -> bool:
+    return price.strip() in _FREE_PRICES
+
+
+def _secure_eq(a: str, b: str) -> bool:
+    """Constant-time secret comparison; False if either side is empty."""
+    if not a or not b:
+        return False
+    return hmac.compare_digest(a, b)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -56,7 +70,12 @@ app.add_middleware(AuditMiddleware)
 
 
 # --- x402 Payment Middleware ---
+# True only when the x402 middleware is actually installed and enforcing.
+_PAYMENTS_ENABLED = False
+
+
 def _setup_x402() -> None:
+    global _PAYMENTS_ENABLED
     wallet = os.environ.get("WALLET_ADDRESS", "")
     facilitator_url = os.environ.get("X402_FACILITATOR_URL", "https://x402.org/facilitator")
 
@@ -92,13 +111,44 @@ def _setup_x402() -> None:
         }
 
         app.add_middleware(PaymentMiddlewareASGI, routes=routes, server=server)
+        _PAYMENTS_ENABLED = True
         logger.info(f"x402 payment gating ENABLED on /v1/query ({QUERY_PRICE} USDC on Base)")
 
     except Exception:
-        logger.exception("Failed to initialize x402 — payment gating DISABLED")
+        # Fail CLOSED: if a non-zero price is configured but x402 can't load,
+        # the x402_fail_closed middleware below refuses paid routes (503) rather
+        # than silently giving results away. During free alpha ($0.00) we serve.
+        if _price_is_free(QUERY_PRICE):
+            logger.exception("x402 unavailable — serving free (X402_PRICE=%s)", QUERY_PRICE)
+        else:
+            logger.error(
+                "x402 FAILED to initialize but X402_PRICE=%s is non-zero — "
+                "failing CLOSED on /v1/query until payments are restored",
+                QUERY_PRICE,
+            )
 
 
 _setup_x402()
+
+
+@app.middleware("http")
+async def x402_fail_closed(request: Request, call_next):
+    """Refuse paid routes when payment enforcement is unavailable and the
+    configured price is non-zero. Admins with a valid key bypass."""
+    if (
+        not _PAYMENTS_ENABLED
+        and not _price_is_free(QUERY_PRICE)
+        and request.method == "POST"
+        and request.url.path == "/v1/query"
+        and not getattr(request.state, "x402_bypass", False)
+    ):
+        return make_error(
+            code=ErrorCode.FACILITATOR_UNAVAILABLE,
+            message="Payment verification unavailable. Try again shortly.",
+            retry=True,
+            status_code=503,
+        )
+    return await call_next(request)
 
 
 @app.middleware("http")
@@ -106,7 +156,7 @@ async def admin_bypass(request: Request, call_next):
     """Allow admin requests to bypass x402 payment for testing."""
     admin_key = request.headers.get("x-admin-key", "")
     expected = os.environ.get("UPLOAD_SECRET", "")
-    if admin_key and expected and admin_key == expected:
+    if _secure_eq(admin_key, expected):
         # Strip the x402 payment requirement by marking as pre-paid
         request.state.x402_bypass = True
     return await call_next(request)
@@ -215,9 +265,7 @@ async def request_size_limit(request: Request, call_next):
 
 def verify_upload_token(authorization: Annotated[str | None, Header()] = None) -> None:
     expected = os.environ.get("UPLOAD_SECRET", "")
-    if not authorization or not expected:
-        raise HTTPException(status_code=401, detail="Unauthorized")
-    if authorization != f"Bearer {expected}":
+    if not _secure_eq(authorization or "", f"Bearer {expected}" if expected else ""):
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 
@@ -420,7 +468,7 @@ async def root(request: Request):
         tool_schema = QueryRequest.model_json_schema()
         admin_key = request.headers.get("x-admin-key", "")
         expected = os.environ.get("UPLOAD_SECRET", "")
-        is_admin = bool(admin_key and expected and admin_key == expected)
+        is_admin = _secure_eq(admin_key, expected)
         html = render_landing(
             base,
             filing_count,
