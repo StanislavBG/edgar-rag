@@ -27,6 +27,7 @@ select = ["E", "W", "F", "I", "B", "S", "RUF"]
 "src/audit.py" = ["E501"]
 "src/highlights.py" = ["E501"]
 "src/refresh.py" = ["S603", "S607"]  # local ops script: gh/tar with constant args
+"src/llm.py" = ["S603"]  # local ops: `claude` CLI with constant argv
 
 [tool.bandit]
 exclude_dirs = ["tests"]

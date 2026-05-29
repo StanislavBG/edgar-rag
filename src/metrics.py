@@ -2,11 +2,11 @@
 
 The decision-grade, *numbers* surface for trader agents — quarterly/annual
 revenue, net income, EPS, margins, plus a free-form segment breakdown. Runs
-locally after ingestion (needs ANTHROPIC_API_KEY), writes static JSON to
-data/metrics/{slug}.json, served free over MCP by get_company_metrics.
+locally after ingestion (uses the local `claude -p` CLI — no API key), writes
+static JSON to data/metrics/{slug}.json, served free over MCP by get_company_metrics.
 
-    ANTHROPIC_API_KEY=sk-... python src/metrics.py                 # all companies
-    ANTHROPIC_API_KEY=sk-... python src/metrics.py --company apple # one company
+    python src/metrics.py                 # all companies
+    python src/metrics.py --company apple  # one company
 
 Schema (generic so it fits any company — banks, pharma, tech):
     {
@@ -23,7 +23,6 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-import os
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -106,12 +105,7 @@ def _parse_json(raw: str) -> dict | None:
 
 
 def generate_metrics(slug: str) -> dict:
-    import anthropic
-
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-    if not api_key:
-        logger.error("ANTHROPIC_API_KEY not set. Cannot generate metrics.")
-        return {}
+    from src.llm import claude_prompt
 
     company_name = COMPANY_NAMES.get(slug)
     if not company_name:
@@ -129,22 +123,13 @@ def generate_metrics(slug: str) -> dict:
         return {}
 
     logger.info(f"Extracting metrics for {company_name} ({len(filings)} filings)")
-    client = anthropic.Anthropic(api_key=api_key)
-    message = client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=4000,
+    raw = claude_prompt(
+        prompt=f"Company: {company_name}\n\n{SCHEMA_HINT}\n\nFiling data:\n{context[:24000]}",
         system=SYSTEM_PROMPT,
-        messages=[
-            {
-                "role": "user",
-                "content": (
-                    f"Company: {company_name}\n\n{SCHEMA_HINT}\n\n"
-                    f"Filing data:\n{context[:24000]}"
-                ),
-            }
-        ],
     )
-    parsed = _parse_json(message.content[0].text)
+    if not raw:
+        return {}
+    parsed = _parse_json(raw)
     if parsed is None:
         return {}
 

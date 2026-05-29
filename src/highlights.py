@@ -1,8 +1,9 @@
 """Generate LLM-powered company highlights from indexed SEC filing data.
 
-Run locally after ingestion to regenerate highlights:
-    ANTHROPIC_API_KEY=sk-... python src/highlights.py                    # all companies
-    ANTHROPIC_API_KEY=sk-... python src/highlights.py --company apple    # single company
+Run locally after ingestion to regenerate highlights (uses the local `claude -p`
+CLI — no API key):
+    python src/highlights.py                    # all companies
+    python src/highlights.py --company apple     # single company
 
 Outputs static JSON to data/highlights/{slug}.json, served by company pages.
 Designed to run once per quarter (or whenever new data is ingested).
@@ -13,7 +14,6 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-import os
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -150,20 +150,14 @@ PROMPTS = {
 
 
 def generate_highlights(slug: str) -> dict:
-    """Generate all 3 highlights for a company using Claude API."""
-    import anthropic
-
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-    if not api_key:
-        logger.error("ANTHROPIC_API_KEY not set. Cannot generate highlights.")
-        return {}
+    """Generate all 3 highlights for a company via the local `claude -p` CLI."""
+    from src.llm import claude_prompt
 
     company_name = COMPANY_NAMES.get(slug)
     if not company_name:
         logger.error(f"Unknown company slug: {slug}")
         return {}
 
-    client = anthropic.Anthropic(api_key=api_key)
     filings = _get_company_passages(company_name)
 
     if not filings:
@@ -180,22 +174,20 @@ def generate_highlights(slug: str) -> dict:
             continue
 
         logger.info(f"  Generating {key} ({scope})...")
-        message = client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=1500,
+        content = claude_prompt(
+            prompt=f"Company: {company_name}\n\n{prompt}\n\nFiling data:\n{context[:12000]}",
             system=SYSTEM_PROMPT,
-            messages=[{
-                "role": "user",
-                "content": f"Company: {company_name}\n\n{prompt}\n\nFiling data:\n{context[:12000]}",
-            }],
         )
+        if not content:
+            logger.warning(f"No output for {key} — skipping")
+            continue
         highlights[key] = {
             "title": {
                 "last_filing": "Last Filing Highlight",
                 "last_year": "Last Year in Review",
                 "three_year": "3-Year Trend Analysis",
             }[key],
-            "content": message.content[0].text,
+            "content": content,
             "scope": scope,
         }
 

@@ -1,6 +1,6 @@
 """Local weekly refresh — the cron entry point that keeps prod current.
 
-Runs entirely on the local machine (where torch + ANTHROPIC_API_KEY live):
+Runs entirely on the local machine (where torch + the `claude` CLI live):
 
     1. ingest new filings (idempotent — skips already-indexed accessions)
     2. repair accession_number (safety; cheap no-op once clean)
@@ -9,21 +9,21 @@ Runs entirely on the local machine (where torch + ANTHROPIC_API_KEY live):
 
 Prod (Replit) picks up the new bundle on its next redeploy.
 
-    python src/refresh.py                 # full run, ships to the Release
-    python src/refresh.py --dry-run       # do everything except ship
-    python src/refresh.py --no-intelligence   # data only, skip LLM regen
-    python src/refresh.py --since-days 21     # widen the ingest lookback
+    python -m src.refresh                 # full run, ships to the Release
+    python -m src.refresh --dry-run       # do everything except ship
+    python -m src.refresh --no-intelligence   # data only, skip LLM regen
+    python -m src.refresh --since-days 21     # widen the ingest lookback
 
-Suggested crontab (Mondays 06:00 local) — adjust paths:
-    0 6 * * 1  cd /home/bilko/Projects/edgar-rag && .venv/bin/python src/refresh.py \
-               --companies companies-alpha.txt >> data/refresh.log 2>&1
+Suggested crontab (Mondays 06:00 local) — run as a module so `import src.*` resolves:
+    0 6 * * 1  cd /home/bilko/Projects/edgar-rag && \
+               .venv/bin/python -m src.refresh --companies companies-alpha.txt \
+               >> data/refresh.log 2>&1
 """
 
 from __future__ import annotations
 
 import argparse
 import logging
-import os
 import re
 import subprocess  # nosec B404
 from pathlib import Path
@@ -106,12 +106,14 @@ def refresh(
     logger.info("%d new filings this run", len(new_accessions))
 
     logger.info("=== Step 3/4: intelligence ===")
+    from src.llm import claude_available
+
     if not new_accessions:
         logger.info("No new filings — skipping intelligence regen")
     elif not with_intelligence:
         logger.info("--no-intelligence — skipping regen")
-    elif not os.environ.get("ANTHROPIC_API_KEY"):
-        logger.warning("ANTHROPIC_API_KEY not set — skipping intelligence regen")
+    elif not claude_available():
+        logger.warning("`claude` CLI not found — skipping intelligence regen")
     else:
         from src.highlights import generate_highlights
         from src.metrics import generate_metrics

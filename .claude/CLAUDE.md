@@ -20,7 +20,7 @@ metadata + paid intelligence) are the template for the next ones.
 - `python -m uvicorn src.server:app --reload` — dev server
 - `python src/ingest.py` — run SEC EDGAR ingestion (local only; needs torch; idempotent — skips already-indexed accessions)
 - `python src/refresh.py` — weekly cron entry point: ingest → migrate → regen intelligence → ship to prod
-- `python src/highlights.py` / `python src/metrics.py` — regenerate narrative / structured intelligence (needs ANTHROPIC_API_KEY)
+- `python src/highlights.py` / `python src/metrics.py` — regenerate narrative / structured intelligence (uses local `claude -p` CLI — no API key)
 - `python src/migrate_accession.py` — repair accession_number column from source_url
 - `python src/tracker.py status` — ingestion coverage matrix
 - `python -m pytest` — run tests
@@ -77,7 +77,7 @@ metadata + paid intelligence) are the template for the next ones.
 
 ## Conventions
 - One file per concern: server.py, query.py, mcp.py, ingest.py, upload.py, db.py, tracker.py, audit.py, company.py, landing.py, errors.py, highlights.py, metrics.py, refresh.py, migrate_accession.py
-- Intelligence is precomputed locally → static JSON (data/highlights/{slug}.json narrative, data/metrics/{slug}.json structured) → served free over MCP. No per-call LLM cost in prod.
+- Intelligence is precomputed locally via the `claude -p` CLI (no API key; see src/llm.py) → static JSON (data/highlights/{slug}.json narrative, data/metrics/{slug}.json structured) → served free over MCP. No per-call LLM cost in prod.
 - Shared constants in db.py: DATA_DIR, VECTOR_DIM, TABLE_NAME, MODEL_NAME
 - Type hints on all functions
 - No docstrings unless logic is non-obvious
