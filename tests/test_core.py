@@ -109,3 +109,37 @@ def test_upload_requires_auth(client):
 def test_admin_requires_key(client):
     r = client.get("/admin/api/stats")
     assert r.status_code == 401
+
+
+# --- intelligence MCP tools ---
+def _call(client, name, args):
+    return client.post(
+        "/mcp",
+        json={"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+              "params": {"name": name, "arguments": args}},
+    )
+
+
+def test_mcp_tools_list_includes_intelligence(client):
+    r = client.post("/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
+    names = {t["name"] for t in r.json()["result"]["tools"]}
+    assert {"get_company_highlights", "get_company_metrics"} <= names
+
+
+def test_slug_resolution_by_ticker_and_name():
+    from src.mcp import _resolve_slug
+    assert _resolve_slug("AAPL") == "apple"
+    assert _resolve_slug("apple") == "apple"
+    assert _resolve_slug("Apple Inc.") == "apple"
+    assert _resolve_slug("Nonesuch") is None
+
+
+def test_metrics_unknown_company_errors(client):
+    j = _call(client, "get_company_metrics", {"company": "Nonesuch"}).json()
+    assert j["error"]["code"] == -32602
+
+
+def test_metrics_no_data_is_graceful(client):
+    # A tracked company with no generated metrics yet returns text, not an error.
+    j = _call(client, "get_company_metrics", {"company": "nvidia"}).json()
+    assert "result" in j and "No metrics" in j["result"]["content"][0]["text"]

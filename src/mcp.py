@@ -7,6 +7,7 @@ Paid: tools/call search_filings (price via X402_PRICE env var)
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import re
@@ -14,6 +15,7 @@ import re
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
+from src.company import COMPANIES
 from src.db import (
     get_companies,
     get_filing_by_accession,
@@ -21,6 +23,8 @@ from src.db import (
     get_table,
     search,
 )
+from src.highlights import COMPANY_NAMES, load_highlights
+from src.metrics import load_metrics
 from src.query import QueryRequest, embed_query
 
 logger = logging.getLogger("edgar-rag")
@@ -36,7 +40,8 @@ SERVER_INFO = {
         "Semantic search over SEC EDGAR filings (10-K, 10-Q, 8-K). "
         "Query by natural language, get ranked passages with citations. "
         f"{QUERY_PRICE}/query via x402 (free during alpha). "
-        "Free tools: list_companies, get_data_catalog, get_filing."
+        "Free tools: list_companies, get_data_catalog, get_filing, "
+        "get_company_highlights, get_company_metrics."
     ),
     "capabilities": {"tools": {}},
 }
@@ -97,7 +102,73 @@ TOOLS = [
         ),
         "inputSchema": {"type": "object", "properties": {}},
     },
+    {
+        "name": "get_company_highlights",
+        "description": (
+            "Pre-computed analyst-style narrative highlights for a company — last filing, "
+            "last year in review, and 3-year trend analysis, written from its SEC filings. "
+            "Free — no payment required."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "required": ["company"],
+            "properties": {
+                "company": {
+                    "type": "string",
+                    "description": "Slug, ticker, or name (e.g. apple, AAPL, Apple Inc.)",
+                },
+                "scope": {
+                    "type": "string",
+                    "enum": ["last_filing", "last_year", "three_year"],
+                    "description": "Optional — return only this section instead of all three",
+                },
+            },
+        },
+    },
+    {
+        "name": "get_company_metrics",
+        "description": (
+            "Pre-computed structured financials for a company — quarterly and annual "
+            "revenue, net income, EPS, margins, and segment breakdowns (USD billions), "
+            "extracted from its SEC filings. Returns JSON. Free — no payment required."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "required": ["company"],
+            "properties": {
+                "company": {
+                    "type": "string",
+                    "description": "Slug, ticker, or name (e.g. apple, AAPL, Apple Inc.)",
+                },
+                "period": {
+                    "type": "string",
+                    "enum": ["quarterly", "annual", "all"],
+                    "description": "Optional — restrict to quarterly or annual (default: all)",
+                },
+            },
+        },
+    },
 ]
+
+
+def _resolve_slug(company: str) -> str | None:
+    """Resolve a slug, ticker, or company name to an intelligence slug."""
+    if not company:
+        return None
+    key = company.strip().lower()
+    if key in COMPANY_NAMES:
+        return key
+    for slug, meta in COMPANIES.items():
+        if key == meta.get("ticker", "").lower() or key == meta.get("name", "").lower():
+            return slug
+    for slug, name in COMPANY_NAMES.items():
+        if key in name.lower():
+            return slug
+    return None
+
+
+def _company_choices() -> str:
+    return ", ".join(sorted(COMPANY_NAMES))
 
 
 def _jsonrpc_response(req_id: int | str | None, result: dict) -> dict:
@@ -237,6 +308,67 @@ async def mcp_handler(request: Request) -> JSONResponse:
             return JSONResponse(
                 content=_jsonrpc_response(
                     req_id, {"content": [{"type": "text", "text": text}]}
+                )
+            )
+
+        if tool_name == "get_company_highlights":
+            slug = _resolve_slug(arguments.get("company", ""))
+            if slug is None:
+                return JSONResponse(
+                    content=_jsonrpc_error(
+                        req_id, -32602,
+                        f"Unknown company. Available: {_company_choices()}",
+                    ),
+                    status_code=400,
+                )
+            data = load_highlights(slug)
+            if not data or not data.get("highlights"):
+                text = f"No highlights generated yet for {slug}.\n"
+                return JSONResponse(
+                    content=_jsonrpc_response(
+                        req_id, {"content": [{"type": "text", "text": text}]}
+                    )
+                )
+            scope = arguments.get("scope")
+            items = data["highlights"]
+            if scope:
+                items = {scope: items[scope]} if scope in items else {}
+            lines = [f"{data['company']} — generated {data.get('generated_at', '')[:10]}\n"]
+            for h in items.values():
+                lines.append(f"## {h['title']}\n{h['content']}\n")
+            return JSONResponse(
+                content=_jsonrpc_response(
+                    req_id, {"content": [{"type": "text", "text": "\n".join(lines)}]}
+                )
+            )
+
+        if tool_name == "get_company_metrics":
+            slug = _resolve_slug(arguments.get("company", ""))
+            if slug is None:
+                return JSONResponse(
+                    content=_jsonrpc_error(
+                        req_id, -32602,
+                        f"Unknown company. Available: {_company_choices()}",
+                    ),
+                    status_code=400,
+                )
+            data = load_metrics(slug)
+            if not data:
+                text = f"No metrics generated yet for {slug}.\n"
+                return JSONResponse(
+                    content=_jsonrpc_response(
+                        req_id, {"content": [{"type": "text", "text": text}]}
+                    )
+                )
+            period = arguments.get("period", "all")
+            if period == "quarterly":
+                data = {k: v for k, v in data.items() if k != "annual"}
+            elif period == "annual":
+                data = {k: v for k, v in data.items() if k != "quarterly"}
+            return JSONResponse(
+                content=_jsonrpc_response(
+                    req_id,
+                    {"content": [{"type": "text", "text": json.dumps(data, indent=2)}]},
                 )
             )
 

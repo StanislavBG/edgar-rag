@@ -84,6 +84,20 @@ def _full_table_df(table):
     return _full_df_cache
 
 
+def get_indexed_accessions() -> set[str]:
+    """Set of accession_numbers already in the vector table — the dedup ledger
+    for incremental/scheduled ingests. Empty if the table doesn't exist yet."""
+    table = get_table()
+    if table is None:
+        return set()
+    try:
+        df = _full_table_df(table)
+        return set(df["accession_number"].dropna().unique().tolist())
+    except Exception:
+        logger.exception("Failed to read indexed accessions")
+        return set()
+
+
 def get_companies() -> list[str]:
     global _companies_cache
     if _companies_cache is not None:
