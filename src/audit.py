@@ -10,6 +10,7 @@ coarse client metadata. Privacy rules from CLAUDE.md apply:
 
 from __future__ import annotations
 
+import hmac
 import json
 import logging
 import os
@@ -236,7 +237,7 @@ class AuditMiddleware:
         referer = (request.headers.get("referer", "") or "-")[:200]
         admin_key = request.headers.get("x-admin-key", "")
         expected = os.environ.get("UPLOAD_SECRET", "")
-        admin_used = bool(admin_key and expected and admin_key == expected)
+        admin_used = _secure_eq(admin_key, expected)
         has_x402 = bool(request.headers.get("x-payment") or request.headers.get("x-payment-response"))
 
         # Query pattern capture (no full content)
@@ -310,9 +311,16 @@ class AuditMiddleware:
 router = APIRouter()
 
 
+def _secure_eq(a: str | None, b: str | None) -> bool:
+    """Constant-time secret comparison; False if either side is empty."""
+    if not a or not b:
+        return False
+    return hmac.compare_digest(a, b)
+
+
 def _require_admin(x_admin_key: str | None) -> None:
     expected = os.environ.get("UPLOAD_SECRET", "")
-    if not expected or not x_admin_key or x_admin_key != expected:
+    if not _secure_eq(x_admin_key, expected):
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 

@@ -40,13 +40,21 @@ Set in Replit Secrets (not in shell, not in code):
 | `X402_FACILITATOR_URL` | Coinbase facilitator endpoint |
 | `UPLOAD_SECRET` | Bearer token for `/upload-vectors` and `/admin/*` |
 | `ALLOWED_HOSTS` | TrustedHost middleware whitelist (use `*` for any) |
+| `GITHUB_TOKEN` | Read token for the private repo — lets `install.sh` pull the vector bundle from the `v0.1.0-data` Release at build time. Without it, the server starts with 0 filings. |
 
 ## Data Flow
-1. Vectors are **not in Git** (too big, 50MB+ compressed)
+1. Vectors are **not in Git** (too big, 48MB compressed)
 2. Local machine runs `python src/ingest.py` → populates `data/vectors/`
-3. Local machine runs `python src/upload.py` → uploads to Replit via chunked POST
-4. Replit stores vectors on persistent disk at `data/vectors/`
+3. Local machine tars and uploads the bundle to the `v0.1.0-data` GitHub Release:
+   `tar czf edgar-vectors.tar.gz -C data vectors && gh release upload v0.1.0-data edgar-vectors.tar.gz --clobber`
+4. On Cloud Run **build**, `install.sh` downloads the bundle (auth via `GITHUB_TOKEN`)
+   and extracts it to `data/vectors/` — baked into the image, so it survives cold
+   starts and redeploys. (Cloud Run's runtime disk is ephemeral; `/upload-vectors`
+   pushes there and is lost on restart — fine for hot-patching, not for durability.)
 5. Server reads vectors at runtime for query search
+
+> If `accession_number` ever looks like a CIK again, re-run `python src/migrate_accession.py`
+> (it re-derives accession from `source_url`) before re-tarring and uploading the Release.
 
 ## Troubleshooting
 
