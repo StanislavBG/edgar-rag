@@ -26,7 +26,7 @@ import numpy as np
 import pyarrow as pa
 from dotenv import load_dotenv
 
-from src.db import DATA_DIR, MODEL_NAME, TABLE_NAME, VECTOR_DIM
+from src.db import DATA_DIR, MODEL_NAME, TABLE_NAME, VECTOR_DIM, get_indexed_accessions, reload_db
 
 logger = logging.getLogger("edgar-ingest")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -328,14 +328,18 @@ def chunk_text(
     return chunks
 
 
+def accession_for(filing: dict) -> str:
+    """Accession is the filename in the index URL (…/<cik>/<accession>.txt), NOT the
+    parent dir (which is the CIK). [-2] was the long-standing data bug."""
+    return filing.get(
+        "accession_number", filing["index_url"].split("/")[-1].replace(".txt", "")
+    )
+
+
 def create_chunks(filing: dict, text: str) -> list[dict]:
     """Create chunks from a single filing."""
     sections = split_by_sections(text, filing["filing_type"])
-    # Accession is the filename in the index URL (…/<cik>/<accession>.txt), NOT the
-    # parent dir (which is the CIK). [-2] was the long-standing data bug.
-    accession = filing.get(
-        "accession_number", filing["index_url"].split("/")[-1].replace(".txt", "")
-    )
+    accession = accession_for(filing)
     source_url = filing["index_url"]
 
     all_chunks = []
@@ -463,6 +467,13 @@ def run_ingest(
     all_chunks: list[dict] = []
     filing_stats: list[dict] = []  # For tracker
 
+    # Dedup ledger: skip filings already in the vector table so repeated/scheduled
+    # runs don't re-download, re-embed, or duplicate rows. The table is the source
+    # of truth (accession_number is now correct post-migration).
+    seen = get_indexed_accessions()
+    logger.info(f"{len(seen)} filings already indexed — will skip those")
+    skipped = 0
+
     for y, q in quarters:
         filings = fetch_index(client, y, q, allowed_ciks=allowed_ciks)
         logger.info(f"Processing {len(filings)} filings for {y} Q{q}")
@@ -470,6 +481,10 @@ def run_ingest(
         for i, filing in enumerate(filings):
             if (i + 1) % 50 == 0:
                 logger.info(f"  Progress: {i + 1}/{len(filings)}")
+
+            if accession_for(filing) in seen:
+                skipped += 1
+                continue
 
             html = download_filing(client, filing)
             if not html:
@@ -484,9 +499,7 @@ def run_ingest(
 
             # Track this filing
             ticker = cik_to_ticker.get(filing["cik"], filing["cik"])
-            accession = filing.get(
-                "accession_number", filing["index_url"].split("/")[-1].replace(".txt", "")
-            )
+            accession = accession_for(filing)
             filing_stats.append(
                 {
                     "ticker": ticker,
@@ -500,9 +513,10 @@ def run_ingest(
             )
 
     client.close()
+    logger.info(f"Skipped {skipped} already-indexed filings")
 
     if not all_chunks:
-        logger.warning("No chunks generated. Check if filings were downloaded successfully.")
+        logger.info("No new filings to ingest — nothing to do.")
         return
 
     logger.info(f"Embedding {len(all_chunks)} chunks...")
@@ -517,6 +531,8 @@ def run_ingest(
 
     record_filings_batch(filing_stats)
     logger.info(f"Tracked {len(filing_stats)} filings in tracker.db")
+
+    reload_db()  # refresh in-process caches so follow-on steps see the new rows
 
 
 def main() -> None:

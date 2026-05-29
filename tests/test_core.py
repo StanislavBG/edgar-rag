@@ -109,3 +109,59 @@ def test_upload_requires_auth(client):
 def test_admin_requires_key(client):
     r = client.get("/admin/api/stats")
     assert r.status_code == 401
+
+
+# --- intelligence MCP tools ---
+def _call(client, name, args):
+    return client.post(
+        "/mcp",
+        json={"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+              "params": {"name": name, "arguments": args}},
+    )
+
+
+def test_mcp_tools_list_includes_intelligence(client):
+    r = client.post("/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
+    names = {t["name"] for t in r.json()["result"]["tools"]}
+    assert {"get_company_highlights", "get_company_metrics"} <= names
+
+
+def test_slug_resolution_by_ticker_and_name():
+    from src.mcp import _resolve_slug
+    assert _resolve_slug("AAPL") == "apple"
+    assert _resolve_slug("apple") == "apple"
+    assert _resolve_slug("Apple Inc.") == "apple"
+    assert _resolve_slug("Nonesuch") is None
+
+
+def test_metrics_unknown_company_errors(client):
+    j = _call(client, "get_company_metrics", {"company": "Nonesuch"}).json()
+    assert j["error"]["code"] == -32602
+
+
+# --- XBRL fiscal labeling (period identity comes from end date, not fy/fp) ---
+def test_fye_month_detection():
+    from src.metrics import _fye_month
+    assert _fye_month(["2025-09-27", "2024-09-28", "2023-09-30"]) == 9
+
+
+def test_fiscal_label_from_end_date():
+    from src.metrics import _fiscal_label
+    # Apple FYE = September. Quarter identity derives from the period end date,
+    # NOT XBRL fy/fp (which restate comparatives under the filing's context).
+    assert _fiscal_label("2025-12-27", 9) == (2026, "Q1 FY2026")
+    assert _fiscal_label("2026-03-28", 9) == (2026, "Q2 FY2026")
+    assert _fiscal_label("2024-12-28", 9) == (2025, "Q1 FY2025")
+    assert _fiscal_label("2025-09-27", 9)[1] == "Q4 FY2025"
+
+
+def test_metrics_tracked_company_never_errors(client):
+    # A tracked company always returns a result block (data or a "no data yet"
+    # note), never a JSON-RPC error — only unknown companies error.
+    j = _call(client, "get_company_metrics", {"company": "nvidia"}).json()
+    assert "result" in j and "error" not in j
+
+
+def test_load_metrics_unknown_slug_is_none():
+    from src.metrics import load_metrics
+    assert load_metrics("definitely-not-a-company") is None
