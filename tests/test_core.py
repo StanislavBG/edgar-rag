@@ -139,6 +139,22 @@ def test_metrics_unknown_company_errors(client):
     assert j["error"]["code"] == -32602
 
 
+# --- XBRL fiscal labeling (period identity comes from end date, not fy/fp) ---
+def test_fye_month_detection():
+    from src.metrics import _fye_month
+    assert _fye_month(["2025-09-27", "2024-09-28", "2023-09-30"]) == 9
+
+
+def test_fiscal_label_from_end_date():
+    from src.metrics import _fiscal_label
+    # Apple FYE = September. Quarter identity derives from the period end date,
+    # NOT XBRL fy/fp (which restate comparatives under the filing's context).
+    assert _fiscal_label("2025-12-27", 9) == (2026, "Q1 FY2026")
+    assert _fiscal_label("2026-03-28", 9) == (2026, "Q2 FY2026")
+    assert _fiscal_label("2024-12-28", 9) == (2025, "Q1 FY2025")
+    assert _fiscal_label("2025-09-27", 9)[1] == "Q4 FY2025"
+
+
 def test_metrics_no_data_is_graceful(client):
     # A tracked company with no generated metrics yet returns text, not an error.
     j = _call(client, "get_company_metrics", {"company": "nvidia"}).json()
