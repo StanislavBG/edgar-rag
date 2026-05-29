@@ -155,7 +155,13 @@ def test_fiscal_label_from_end_date():
     assert _fiscal_label("2025-09-27", 9)[1] == "Q4 FY2025"
 
 
-def test_metrics_no_data_is_graceful(client):
-    # A tracked company with no generated metrics yet returns text, not an error.
+def test_metrics_tracked_company_never_errors(client):
+    # A tracked company always returns a result block (data or a "no data yet"
+    # note), never a JSON-RPC error — only unknown companies error.
     j = _call(client, "get_company_metrics", {"company": "nvidia"}).json()
-    assert "result" in j and "No metrics" in j["result"]["content"][0]["text"]
+    assert "result" in j and "error" not in j
+
+
+def test_load_metrics_unknown_slug_is_none():
+    from src.metrics import load_metrics
+    assert load_metrics("definitely-not-a-company") is None

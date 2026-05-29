@@ -10,3 +10,6 @@ dist/
 
 models/
 uv.lock
+
+# stray environment artifact
+<path>
